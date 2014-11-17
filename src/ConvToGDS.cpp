@@ -633,7 +633,9 @@ COREARRAY_DLL_EXPORT SEXP gnr_Parse_VCF4(SEXP vcf_fn, SEXP gds_root,
 					sALT=="a" || sALT=="g" || sALT=="c" || sALT=="t"));
 				if (!flag)
 				{
-					RL.SkipLine();
+					// RL.SkipLine();
+					for (int i=nTotalSamp+4; i > 0; i--)
+						RL.GetCell(cell, i <= 1);
 					continue;
 				}
 			}
@@ -702,7 +704,8 @@ COREARRAY_DLL_EXPORT SEXP gnr_Parse_VCF4(SEXP vcf_fn, SEXP gds_root,
 				if (s != p)
 					AlleleList.push_back(string(p, s));
 
-				const char *ss = CHAR(STRING_ELT(RefAllele, GDS_Global_Variant_Index-1));
+				const char *ss = CHAR(STRING_ELT(RefAllele,
+					GDS_Global_Variant_Index-1));
 				ref_allele_index = -1;
 				for (int i=0; i < (int)AlleleList.size(); i++)
 				{
