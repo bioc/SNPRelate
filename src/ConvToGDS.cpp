@@ -8,7 +8,7 @@
 //
 // ConvVCF2GDS.cpp: the C++ code for the conversion from VCF to GDS
 //
-// Copyright (C) 2013 - 2014	Xiuwen Zheng [zhengxwen@gmail.com]
+// Copyright (C) 2013 - 2015	Xiuwen Zheng [zhengxwen@gmail.com]
 //
 // This file is part of SeqArray.
 //
@@ -164,6 +164,20 @@ public:
 					_cur_char ++;
 			}
 		}
+
+		if (str_end > str_begin+1)
+		{
+			if ((str_begin[0] == '\"') && (str_end[-1] == '\"'))
+			{
+				str_begin ++;
+				str_end --;
+			} else if ((str_begin[0] == '\'') && (str_end[-1] == '\''))
+			{
+				str_begin ++;
+				str_end --;
+			}
+		}
+
 		buffer.assign(str_begin, str_end);
 	}
 
@@ -512,6 +526,18 @@ extern "C"
 static C_Int32 GDS_Variant_Index = 0;
 static C_Int32 GDS_Global_Variant_Index = 0;
 
+/// return true, if matching
+inline static bool StrCaseCmp(const char *prefix, const char *txt)
+{
+	while (*prefix && *txt)
+	{
+		if (toupper(*prefix) != toupper(*txt))
+			return false;
+		prefix ++; txt ++;
+	}
+	return (*prefix == 0);
+}
+
 /// Initialize 'GDS_Variant_Index'
 COREARRAY_DLL_EXPORT SEXP gnr_Init_Parse_VCF4()
 {
@@ -525,16 +551,18 @@ COREARRAY_DLL_EXPORT SEXP gnr_Init_Parse_VCF4()
  *  \param vcf_fn            the file names of VCF format
  *  \param gds_root          the root of GDS file
  *  \param method            the method index: 1 -- biallelic.only
- *  \param ReadLineFun       the calling
- *  \param ReadLine_Param    the parameter for calling function
+ *  \param ReadLineFun       calling function
+ *  \param ReadLine_File     the parameter of 'con' in 'readLines'
+ *  \param ReadLine_N        the parameter of 'n' in 'readLines'
  *  \param RefAllele         the reference alleles
+ *  \param ChrPrefix         chr prefix could be ignored
  *  \param rho               the environment
  *  \param Verbose           print out information
  *  \return                  the number of variants
 **/
 COREARRAY_DLL_EXPORT SEXP gnr_Parse_VCF4(SEXP vcf_fn, SEXP gds_root,
-	SEXP method, SEXP ReadLineFun, SEXP ReadLine_Param, SEXP RefAllele,
-	SEXP rho, SEXP Verbose)
+	SEXP method, SEXP ReadLineFun, SEXP ReadLine_File, SEXP ReadLine_N,
+	SEXP RefAllele, SEXP ChrPrefix, SEXP rho, SEXP Verbose)
 {
 	const char *fn = CHAR(STRING_ELT(vcf_fn, 0));
 	int met_idx = INTEGER(method)[0];
@@ -552,7 +580,7 @@ COREARRAY_DLL_EXPORT SEXP gnr_Parse_VCF4(SEXP vcf_fn, SEXP gds_root,
 
 	COREARRAY_TRY
 
-		// *********************************************************
+		// =========================================================
 		// initialize variables		
 
 		const bool RaiseError = true;
@@ -584,13 +612,20 @@ COREARRAY_DLL_EXPORT SEXP gnr_Parse_VCF4(SEXP vcf_fn, SEXP gds_root,
 		vector<C_UInt8> U8s;
 		U8s.resize(nTotalSamp);
 
+		// chr prefix
+		vector<string> ChrPref;
+		for (int i=0; i < XLENGTH(ChrPrefix); i++)
+			ChrPref.push_back(CHAR(STRING_ELT(ChrPrefix, i)));
 
-		// *********************************************************
+
+		// =========================================================
 		// initialize external calling for reading stream
 
+		// 'readLine(con, n)'
 		SEXP R_Read_Call;
 		PROTECT(R_Read_Call =
-			LCONS(ReadLineFun, LCONS(ReadLine_Param, R_NilValue)));
+			LCONS(ReadLineFun, LCONS(ReadLine_File,
+			LCONS(ReadLine_N, R_NilValue))));
 		RL.Init(R_Read_Call, rho);
 		RL.SplitByTab();
 
@@ -603,7 +638,7 @@ COREARRAY_DLL_EXPORT SEXP gnr_Parse_VCF4(SEXP vcf_fn, SEXP gds_root,
 		}
 
 
-		// *********************************************************
+		// =========================================================
 		// parse the context
 
 		string sCHROM, sPOS, sID, sREF, sALT;
@@ -660,6 +695,18 @@ COREARRAY_DLL_EXPORT SEXP gnr_Parse_VCF4(SEXP vcf_fn, SEXP gds_root,
 			GDS_Variant_Index ++;
 
 			// column 1: CHROM
+			{
+				const char *s = sCHROM.c_str();
+				vector<string>::iterator it = ChrPref.begin();
+				for (; it != ChrPref.end(); it++)
+				{
+					if (StrCaseCmp(it->c_str(), s))
+					{
+						sCHROM.erase(0, it->size());
+						break;
+					}
+				}
+			}
 			GDS_Seq_AppendString(varChr, sCHROM.c_str());
 
 			// column 2: POS
@@ -866,15 +913,16 @@ COREARRAY_DLL_EXPORT SEXP gnr_Parse_VCF4(SEXP vcf_fn, SEXP gds_root,
 /** Oxford GEN --> SNP GDS
  *  \param vcf_fn            the file names of VCF format
  *  \param gds_root          the root of GDS file
- *  \param ReadLineFun       the calling
- *  \param ReadLine_Param    the parameter for calling function
+ *  \param ReadLineFun       calling function
+ *  \param ReadLine_File     the parameter of 'con' in 'readLines'
+ *  \param ReadLine_N        the parameter of 'n' in 'readLines'
  *  \param rho               the environment
  *  \param Verbose           print out information
  *  \return                  the number of variants
 **/
 COREARRAY_DLL_EXPORT SEXP gnr_Parse_GEN(SEXP gen_fn, SEXP gds_root,
-	SEXP ChrCode, SEXP CallThreshold, SEXP ReadLineFun, SEXP ReadLine_Param,
-	SEXP rho, SEXP Verbose)
+	SEXP ChrCode, SEXP CallThreshold, SEXP ReadLineFun, SEXP ReadLine_File,
+	SEXP ReadLine_N, SEXP rho, SEXP Verbose)
 {
 	const char *fn = CHAR(STRING_ELT(gen_fn, 0));
 	int verbose = asLogical(Verbose);
@@ -892,7 +940,7 @@ COREARRAY_DLL_EXPORT SEXP gnr_Parse_GEN(SEXP gen_fn, SEXP gds_root,
 
 	COREARRAY_TRY
 
-		// *********************************************************
+		// =========================================================
 		// initialize variables		
 
 		const bool RaiseError = true;
@@ -931,16 +979,18 @@ COREARRAY_DLL_EXPORT SEXP gnr_Parse_GEN(SEXP gen_fn, SEXP gds_root,
 		string AlleleA, AlleleB;
 
 
-		// *********************************************************
+		// =========================================================
 		// initialize external calling for reading stream
 
+		// 'readLine(con, n)'
 		SEXP R_Read_Call;
 		PROTECT(R_Read_Call =
-			LCONS(ReadLineFun, LCONS(ReadLine_Param, R_NilValue)));
+			LCONS(ReadLineFun, LCONS(ReadLine_File,
+			LCONS(ReadLine_N, R_NilValue))));
 		RL.Init(R_Read_Call, rho);
 		RL.SplitBySpaceTab();
 
-		// *********************************************************
+		// =========================================================
 		// parse the context
 
 		int LN = 0;

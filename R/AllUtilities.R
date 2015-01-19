@@ -6,7 +6,8 @@
 #     A High-performance Computing Toolset for Relatedness and
 # Principal Component Analysis of SNP Data
 #
-# Copyright (C) 2011 - 2014        Xiuwen Zheng
+# Copyright (C) 2011 - 2015        Xiuwen Zheng
+# License: GPL-3
 # Email: zhengxwen@gmail.com
 #
 
@@ -103,7 +104,8 @@
     stopifnot(is.null(sample.id) | is.vector(sample.id) | is.factor(sample.id))
     stopifnot(is.null(snp.id) | is.vector(snp.id) | is.factor(snp.id))
 
-    stopifnot(is.logical(autosome.only))
+    stopifnot(is.logical(autosome.only) | is.numeric(autosome.only) |
+        is.character(autosome.only))
     stopifnot(is.vector(autosome.only))
     stopifnot(length(autosome.only) == 1)
 
@@ -168,6 +170,8 @@
     snp.ids <- read.gdsn(index.gdsn(gdsobj, "snp.id"))
     if (!is.null(snp.id))
     {
+        # specify 'snp.id'
+
         n.tmp <- length(snp.id)
         if (!is.null(allele.freq))
         {
@@ -182,26 +186,39 @@
         if (n.snp <= 0)
             stop("No SNP in the working dataset.")
 
-        if (autosome.only)
+        if (!identical(autosome.only, FALSE))
         {
             nt <- index.gdsn(gdsobj, "snp.chromosome")
-            dt <- objdesp.gdsn(nt)
-            if (dt$type == "String")
+            if (identical(autosome.only, TRUE))
             {
-                snp.id <- snp.id & .Call(gnrChromParseNumeric, nt)
+                dt <- objdesp.gdsn(nt)
+                if (dt$type == "String")
+                {
+                    snp.id <- snp.id & .Call(gnrChromParseNumeric, nt)
+                } else {
+                    opt <- snpgdsOption(gdsobj)
+                    snp.id <- snp.id & .Call(gnrChromRangeNumeric, nt,
+                        as.integer(opt$autosome.start),
+                        as.integer(opt$autosome.end))
+                }
             } else {
-                opt <- snpgdsOption(gdsobj)
-                snp.id <- snp.id & .Call(gnrChromRangeNumeric, nt,
-                    as.integer(opt$autosome.start),
-                    as.integer(opt$autosome.end))
+                snp.id <- snp.id & (read.gdsn(nt) == autosome.only)
+                snp.id[is.na(snp.id)] <- FALSE
             }
+
             if (!is.null(allele.freq))
                 allele.freq <- allele.freq[match(snp.ids[snp.id], tmp.id)]
             if (verbose)
             {
-                tmp <- n.snp - sum(snp.id)
-                if (tmp > 0)
-                    cat("Removing", tmp, "non-autosomal SNPs.\n")
+                if (identical(autosome.only, TRUE))
+                {
+                    cat("Removing", dt$dim - sum(snp.id),
+                        "SNP(s) on non-autosomes\n")
+                } else {
+                    cat("Keeping ", sum(snp.id),
+                        " SNP(s) according to chromosome ", autosome.only,
+                        "\n", sep="")
+                }
             }
         } else {
             if (!is.null(allele.freq))
@@ -210,35 +227,46 @@
         snp.ids <- snp.ids[snp.id]
 
     } else {
+        # not specify 'snp.id'
+
         if (!is.null(allele.freq))
         {
             if (length(allele.freq) != length(snp.ids))
                 stop("'length(allele.freq)' should be the number of SNPs.")
         }
-        if (autosome.only)
+
+        if (!identical(autosome.only, FALSE))
         {
             nt <- index.gdsn(gdsobj, "snp.chromosome")
-            dt <- objdesp.gdsn(nt)
-            if (dt$type == "String")
+            if (identical(autosome.only, TRUE))
             {
-                snp.id <- .Call(gnrChromParseNumeric, nt)
+                dt <- objdesp.gdsn(nt)
+                if (dt$type == "String")
+                {
+                    snp.id <- .Call(gnrChromParseNumeric, nt)
+                } else {
+                    opt <- snpgdsOption(gdsobj)
+                    snp.id <- .Call(gnrChromRangeNumeric, nt,
+                        as.integer(opt$autosome.start),
+                        as.integer(opt$autosome.end))
+                }
             } else {
-                opt <- snpgdsOption(gdsobj)
-                snp.id <- .Call(gnrChromRangeNumeric, nt,
-                    as.integer(opt$autosome.start),
-                    as.integer(opt$autosome.end))
+                snp.id <- (read.gdsn(nt) == autosome.only)
+                snp.id[is.na(snp.id)] <- FALSE
             }
+
             if (!is.null(allele.freq))
                 allele.freq <- allele.freq[snp.id]
             if (verbose)
             {
-                tmp <- dt$dim - sum(snp.id)
-                if (tmp > 0)
+                if (identical(autosome.only, TRUE))
                 {
-                    if (tmp > 1)
-                        cat("Removing", tmp, "SNPs on non-autosomes.\n")
-                    else
-                        cat("Removing", tmp, "SNP on non-autosomes.\n")
+                    cat("Removing", dt$dim - sum(snp.id),
+                        "SNP(s) on non-autosomes\n")
+                } else {
+                    cat("Keeping ", sum(snp.id),
+                        " SNP(s) according to chromosome ", autosome.only,
+                        "\n", sep="")
                 }
             }
             snp.ids <- snp.ids[snp.id]
@@ -313,7 +341,8 @@
     # output
     list(sample.id = sample.ids, snp.id = snp.ids,
         n.snp = node$n.snp, n.samp = node$n.samp,
-        allele.freq = allele.freq, num.thread = num.thread)
+        allele.freq = allele.freq, num.thread = num.thread,
+        verbose = verbose)
 }
 
 
@@ -1757,7 +1786,7 @@ snpgdsTranspose <- function(gds.fn, snpfirstdim=FALSE, compress=NULL,
 
     # open the GDS file
     gds <- snpgdsOpen(gds.fn, readonly=FALSE)
-    on.exit(snpgdsClose(gds))
+    on.exit({ snpgdsClose(gds) })
 
     # check dimension
     ns <- names(get.attr.gdsn(index.gdsn(gds, "genotype")))
@@ -1782,7 +1811,7 @@ snpgdsTranspose <- function(gds.fn, snpfirstdim=FALSE, compress=NULL,
     if (snpflag != snpfirstdim)
     {
         if (verbose)
-            cat("Being transposed ...\n")
+            cat("Genotype matrix is being transposed ...\n")
 
         # check
         dm <- rev(dm)
@@ -1821,9 +1850,20 @@ snpgdsTranspose <- function(gds.fn, snpfirstdim=FALSE, compress=NULL,
     } else {
         if (verbose)
         {
-            cat("No action taken, please set 'snpfirstdim=", !snpfirstdim,
-                "'.\n", sep="")
+            cat("No action taken, please set different 'snpfirstdim'.\n",
+                sep="")
         }
+
+        if (!is.null(compress))
+        {
+            compression.gdsn(index.gdsn(gds, "genotype"),
+                compress=compress)
+        }
+        on.exit()
+        snpgdsClose(gds)
+
+        if (optimize)
+            cleanup.gds(gds.fn, verbose=verbose)
     }
 
     invisible()
@@ -2144,80 +2184,233 @@ snpgdsOption <- function(gdsobj=NULL, autosome.start=1L, autosome.end=22L, ...)
 
 
 #############################################################
-# Sliding Windows
+# Sliding Windows Analysis
 #
 
-snpgdsSlidingWindow <- function(snp.id, position, chromosome=NULL,
-    win.size, shift, FUN,
-    param=c("id", "index+id", "index+id+pos"),
+snpgdsSlidingWindow <- function(gdsobj, sample.id=NULL, snp.id=NULL,
+    FUN=NULL, winsize=100000L, shift=10000L, unit=c("basepair", "locus"),
+    winstart=NULL, autosome.only=FALSE, remove.monosnp=TRUE, maf=NaN,
+    missing.rate=NaN, as.is=c("list", "numeric"),
+    with.id=c("snp.id", "snp.id.in.window", "none"), num.thread=1,
     verbose=TRUE, ...)
 {
     # check
-    stopifnot(is.vector(snp.id))
-    stopifnot(is.vector(position) & is.numeric(position))
-    stopifnot(length(snp.id) == length(position))
-    stopifnot(is.numeric(win.size) & (length(win.size)==1))
-    stopifnot(is.numeric(shift) & (length(shift)==1))
-    stopifnot(shift > 0)
-    param <- match.arg(param)
-    stopifnot(is.logical(verbose))
+    ws <- .InitFile2(
+        cmd="Sliding Windows Analysis:",
+        gdsobj=gdsobj, sample.id=sample.id, snp.id=snp.id,
+        autosome.only=autosome.only, remove.monosnp=remove.monosnp,
+        maf=maf, missing.rate=missing.rate, num.thread=num.thread,
+        verbose=verbose)
 
-    FUN <- match.fun(FUN)
+    stopifnot(is.numeric(winsize))
+    stopifnot(is.numeric(shift))
+    unit <- match.arg(unit)
+    as.is <- match.arg(as.is)
+    with.id <- match.arg(with.id)
+    winsize <- as.integer(winsize)[1]
+    shift <- as.integer(shift)[1]
+    stopifnot(is.finite(winsize) & is.finite(shift))
 
-    if (is.null(chromosome))
+    stopifnot(is.null(winstart) | (is.numeric(winstart) & is.vector(winstart)))
+
+    if (is.function(FUN))
     {
-        if (is.unsorted(position))
-            stop("'position' should be in increasing order.")
-
-        if (win.size > length(snp.id))
-        {
-            win.size <- length(snp.id)
-            warning("'win.size' should not be greater than length(snp.id).",
-                immediate.=TRUE)
-        }
-
-        L <- length(snp.id) - win.size + 1L
-        n <- L %/% shift
-        if ((L %% shift) > 0) n <- n + 1L
-        ans <- vector("list", n)
-
-        x <- 1L
-        idx <- 1L
-        if (param == "id")
-        {
-            while (x <= L)
-            {
-                ans[[idx]] <- FUN(snp.id[seq.int(x, x+win.size-1L)], ...)
-                x <- x + shift
-                idx <- idx + 1L
-            }
-        } else if (param == "index+id")
-        {
-            while (x <= L)
-            {
-                ans[[idx]] <- FUN(x, snp.id[seq.int(x, x+win.size-1L)], ...)
-                x <- x + shift
-                idx <- idx + 1L
-            }
-        } else if (param == "index+id+pos")
-        {
-            while (x <= L)
-            {
-                i <- seq.int(x, x+win.size-1L)
-                ans[[idx]] <- FUN(x, snp.id[i], position[i], ...)
-                x <- x + shift
-                idx <- idx + 1L
-            }
-        }
-
-        return(ans)
-
+        FUN <- match.fun(FUN)
+        FunIdx <- 0L
+    } else if (is.character(FUN))
+    {
+        stopifnot(is.vector(FUN))
+        stopifnot(length(FUN) == 1)
+        FunList <- c("snpgdsFst")
+        FunIdx <- match(FUN, FunList)
+        if (is.na(FunIdx))
+            stop("'FUN' should be one of ", paste(FunList, collapse=","), ".")
     } else {
-        stopifnot(is.vector(chromosome))
-        stopifnot(length(chromosome) == length(snp.id))
-
-
+        stop("'FUN' should be a function, or a character.")
     }
+
+    if (verbose)
+    {
+        cat("\tWindow size: ", winsize, ", shift: ", shift, sep="")
+        cat(if (unit == "basepair") " (basepair)\n" else " (locus index)\n")
+    }
+
+    # check function
+    if (FunIdx > 0)
+    {
+        pm <- list(...)
+        param <- switch(EXPR = FUN,
+            snpgdsFst = .paramFst(sample.id, pm$population, pm$method, ws)
+        )
+    }
+
+
+    ########    ########
+
+    # return value
+    ans <- list(sample.id = ws$sample.id)
+    if (with.id %in% c("snp.id", "snp.id.in.window"))
+        ans$snp.id <- ws$snp.id
+
+    total.snp.ids <- read.gdsn(index.gdsn(gdsobj, "snp.id"))
+    snp.flag <- total.snp.ids %in% ws$snp.id
+
+    chr <- read.gdsn(index.gdsn(gdsobj, "snp.chromosome"))
+    snp.flag[is.na(chr)] <- FALSE
+
+    position <- read.gdsn(index.gdsn(gdsobj, "snp.position"))
+    snp.flag[!is.finite(position)] <- FALSE
+    snp.flag[position <= 0] <- FALSE
+
+    if (is.numeric(chr))
+        chrset <- setdiff(unique(chr[snp.flag]), c(0, NA))
+    else if (is.character(chr))
+        chrset <- setdiff(unique(chr[snp.flag]), c("", NA))
+    else
+        stop("Unknown format of 'snp.chromosome'!")
+
+    if (!is.null(winstart))
+    {
+        winstart <- as.integer(winstart)
+        stopifnot(all(is.finite(winstart)))
+        if (length(winstart) != 1)
+        {
+            if (length(winstart) != length(chrset))
+            {
+                stop("'winstart' should be specified according to ",
+                    "the chromosome set (", paste(chrset, collapse =","), ")")
+            }
+        }
+    }
+
+    if (verbose)
+        cat("Chromosome Set: ", paste(chrset, collapse =","), "\n", sep="")
+
+    # for-loop each chromosome
+    for (ch in chrset)
+    {
+        # specific mask for this chromosome
+        chflag <- snp.flag & (chr==ch)
+        sid <- total.snp.ids[chflag]
+        chpos <- position[chflag]
+
+        winst <- NULL
+        if (!is.null(winstart))
+        {
+            winst <- winstart[1]
+            if (length(winstart) > 1)
+                winstart <- winstart[-1]
+        }
+
+        if (verbose)
+        {
+            cat(date(), ", Chromosome ", ch,
+                " (", length(chpos), " SNPs)", sep="")
+        }
+
+        if (is.function(FUN))
+        {
+            ####  the user-defined function
+
+            # calculate how many blocks according to sliding windows
+            if (unit == "basepair")
+            {
+                rg <- range(chpos)
+                if (is.null(winst)) winst <- rg[1]
+                L <- (rg[2] - winst + 1) - winsize + 1L
+                n <- L %/% shift
+                if ((L %% shift) > 0) n <- n + 1L
+
+                if (as.is == "list")
+                    rvlist <- vector("list", n)
+                else
+                    rvlist <- double(n)
+                nlist <- integer(n)
+                poslist <- double(n)
+                if (with.id == "snp.id.in.window")
+                    sidlist <- vector("list", n)
+            
+                x <- rg[1]; i <- 1L
+                while (i <= n)
+                {
+                    k <- (x <= chpos) & (chpos < x+winsize)
+                    ssid <- sid[k]
+                    ppos <- chpos[k]
+                    v <- FUN(ans$sample.id, ssid, ppos, ...)
+                    if (as.is == "list")
+                        rvlist[[i]] <- v
+                    else
+                        rvlist[i] <- as.double(v)[1]
+                    nlist[i] <- length(ppos)
+                    poslist[i] <- mean(ppos)
+                    if (with.id == "snp.id.in.window")
+                        sidlist[[i]] <- ssid
+                    x <- x + shift
+                    i <- i + 1L
+                }
+            } else {
+                if (is.null(winst)) winst <- 1L
+                L <- (length(sid) - winst + 1L) - winsize + 1L
+                n <- L %/% shift
+                if ((L %% shift) > 0) n <- n + 1L
+
+                if (as.is == "list")
+                    rvlist <- vector("list", n)
+                else
+                    rvlist <- double(n)
+                nlist <- integer(n)
+                poslist <- double(n)
+                if (with.id == "snp.id.in.window")
+                    sidlist <- vector("list", n)
+
+                x <- 1L; i <- 1L
+                while (i <= n)
+                {
+                    k <- seq.int(x, x+winsize-1L)
+                    ssid <- sid[k]
+                    ppos <- chpos[k]
+                    v <- FUN(ans$sample.id, ssid, ppos, ...)
+                    if (as.is == "list")
+                        rvlist[[i]] <- v
+                    else
+                        rvlist[i] <- as.double(v)[1]
+                    nlist[i] <- length(ppos)
+                    poslist[i] <- mean(ppos)
+                    if (with.id == "snp.id.in.window")
+                        sidlist[[i]] <- ssid
+                    x <- x + shift
+                    i <- i + 1L
+                }
+            }
+
+            ans[[paste("chr", ch, sep="")]] <- rvlist
+            ans[[paste("chr", ch, ".num", sep="")]] <- nlist
+            ans[[paste("chr", ch, ".pos", sep="")]] <- poslist
+            ans[[paste("chr", ch, ".posrange", sep="")]] <- range(chpos)
+            if (with.id == "snp.id.in.window")
+                ans[[paste("chr", ch, ".snpid", sep="")]] <- sidlist
+
+            if (verbose)
+                cat(sprintf(", %d Windows.\n", length(nlist)))
+
+        } else {
+            ####  specific functions
+
+            v <- .Call(gnrSlidingWindow, FunIdx, winsize, shift, unit, winst,
+                as.is, chflag, chpos, param)
+
+            ans[[paste("chr", ch, sep="")]] <- v[[1]]
+            ans[[paste("chr", ch, ".num", sep="")]] <- v[[2]]
+            ans[[paste("chr", ch, ".pos", sep="")]] <- v[[3]]
+            ans[[paste("chr", ch, ".posrange", sep="")]] <- v[[4]]
+
+            if (verbose)
+                cat(sprintf(", %d Windows.\n", length(v[[2]])))
+        }
+    }
+
+    # output
+    ans
 }
 
 

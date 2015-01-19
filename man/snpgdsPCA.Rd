@@ -20,7 +20,9 @@ snpgdsPCA(gdsobj, sample.id=NULL, snp.id=NULL, autosome.only=TRUE,
         if NULL, all samples are used}
     \item{snp.id}{a vector of snp id specifying selected SNPs; if NULL,
         all SNPs are used}
-    \item{autosome.only}{if TRUE, use autosomal SNPs only}
+    \item{autosome.only}{if \code{TRUE}, use autosomal SNPs only; if it is a
+        numeric or character value, keep SNPs according to the specified
+        chromosome}
     \item{remove.monosnp}{if TRUE, remove monomorphic SNPs}
     \item{maf}{to use the SNPs with ">= maf" only; if NaN, no MAF threshold}
     \item{missing.rate}{to use the SNPs with "<= missing.rate" only; if NaN,
@@ -45,6 +47,7 @@ snpgdsPCA(gdsobj, sample.id=NULL, snp.id=NULL, autosome.only=TRUE,
     \item{snp.id}{the SNP ids used in the analysis}
     \item{eigenval}{eigenvalues}
     \item{eigenvect}{eigenvactors, "# of samples" x "eigen.cnt"}
+    \item{varprop}{variance proportion for each PC}
     \item{TraceXTX}{the trace of the genetic covariance matrix}
     \item{Bayesian}{whether use bayerisan normalization}
     \item{genmat}{the genetic covariance matrix}
@@ -69,9 +72,9 @@ RV <- snpgdsPCA(genofile)
 # eigenvalues
 RV$eigenval
 
-# variance proportion
-head(RV$eigenval / sum(RV$eigenval))
-# [1] 0.122251756 0.058397767 0.010111423 0.009475002 0.008437720 0.007363588
+# variance proportion (%)
+head(round(RV$varprop*100, 2))
+# [1] 12.23  5.84  1.01  0.95  0.84  0.74
 
 
 ####  there is no population information  ####

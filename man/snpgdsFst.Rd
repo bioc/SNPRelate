@@ -7,21 +7,24 @@
     Calculate relatedness measures (like Fst) for specified populations
 }
 \usage{
-snpgdsFst(gdsobj, pop, method=c("W&B02", "W&C84"), sample.id=NULL,
+snpgdsFst(gdsobj, population, method=c("W&B02", "W&C84"), sample.id=NULL,
     snp.id=NULL, autosome.only=TRUE, remove.monosnp=TRUE, maf=NaN,
-    missing.rate=NaN, with.id=TRUE, verbose=TRUE)
+    missing.rate=NaN, with.id=FALSE, verbose=TRUE)
 }
 \arguments{
     \item{gdsobj}{an object of class \code{\link{SNPGDSFileClass}},
         a SNP GDS file}
-    \item{pop}{a factor, indicating population information for each individual}
+    \item{population}{a factor, indicating population information for each
+        individual}
     \item{method}{\code{"W&B02"} -- relative beta estimator in Weir&Hill 2002,
         \code{"W&C84"} -- Fst estimator in Weir&Cockerham 1984}
     \item{sample.id}{a vector of sample id specifying selected samples;
         if NULL, all samples are used}
     \item{snp.id}{a vector of snp id specifying selected SNPs;
         if NULL, all SNPs are used}
-    \item{autosome.only}{if TRUE, use autosomal SNPs only}
+    \item{autosome.only}{if \code{TRUE}, use autosomal SNPs only; if it is a
+        numeric or character value, keep SNPs according to the specified
+        chromosome}
     \item{remove.monosnp}{if TRUE, remove monomorphic SNPs}
     \item{maf}{to use the SNPs with ">= maf" only; if NaN, no MAF threshold}
     \item{missing.rate}{to use the SNPs with "<= missing.rate" only;
@@ -55,14 +58,14 @@ snpgdsFst(gdsobj, pop, method=c("W&B02", "W&C84"), sample.id=NULL,
 # open an example dataset (HapMap)
 genofile <- snpgdsOpen(snpgdsExampleFileName())
 
-pop.group <- as.factor(read.gdsn(index.gdsn(
+group <- as.factor(read.gdsn(index.gdsn(
     genofile, "sample.annot/pop.group")))
 
 # Fst estimation
-snpgdsFst(genofile, pop=pop.group, method="W&B02", with.id=FALSE)
+snpgdsFst(genofile, population=group, method="W&B02")
 
 # or
-snpgdsFst(genofile, pop=pop.group, method="W&C84", with.id=FALSE)
+snpgdsFst(genofile, population=group, method="W&C84")
 
 
 # close the genotype file

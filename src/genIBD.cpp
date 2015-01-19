@@ -8,7 +8,7 @@
 //
 // genIBD.cpp: Identity by descent (IBD) analysis on GWAS
 //
-// Copyright (C) 2011 - 2014	Xiuwen Zheng [zhengxwen@gmail.com]
+// Copyright (C) 2011 - 2015	Xiuwen Zheng [zhengxwen@gmail.com]
 //
 // This file is part of SNPRelate.
 //
@@ -30,9 +30,9 @@
 #define _HEADER_IBD_
 
 // CoreArray library header
-#include <dGenGWAS.h>
-#include <dGWASMath.h>
-#include <dVect.h>
+#include "dGenGWAS.h"
+#include "dGWASMath.h"
+#include "dVect.h"
 
 // Standard library header
 #include <vector>
@@ -149,9 +149,6 @@ namespace IBD
 			double x = 2*AA[i] + AB[i], y = 2*BB[i] + AB[i];
 			double a00, a01, a02, a11, a12;
 
-			//
-			// The following codes are from PLINK/genome.cpp
-			//
 			if (CorrectFactor)
 			{
 				a00 =
@@ -182,10 +179,6 @@ namespace IBD
 				a11 = 2*p*p*q + 2*p*q*q;
 				a12 = p*p*p + q*q*q + p*p*q + p*q*q;
 			}
-
-			//
-			// End: PLINK/genome.cpp
-			//
 
 			if (R_FINITE(a00) && R_FINITE(a01) &&
 				R_FINITE(a02) && R_FINITE(a11) && R_FINITE(a12))
@@ -1897,20 +1890,21 @@ COREARRAY_DLL_EXPORT SEXP gnrIndInb(SEXP afreq, SEXP method, SEXP reltol,
 	COREARRAY_CATCH
 }
 
-/// to compute the inbreeding coefficient
+/// to compute Fst
 COREARRAY_DLL_EXPORT SEXP gnrFst(SEXP Pop, SEXP nPop, SEXP Method)
 {
 	int *PopIdx = INTEGER(Pop);
-	int NumPop = INTEGER(nPop)[0];
+	int NumPop = asInteger(nPop);
+	const char *MetText = CHAR(STRING_ELT(Method, 0));
 
 	COREARRAY_TRY
 
 		const int nSamp = MCWorkingGeno.Space.SampleNum();
 		CdBufSpace BufSNP(MCWorkingGeno.Space, true, CdBufSpace::acInc);
 
-		if (INTEGER(Method)[0] == 1)
+		if (strcmp(MetText, "W&B02") == 0)
 		{
-			// Weir & Hill 2002
+			// Weir & Hill, 2002
 			vector<double> H(NumPop*NumPop, 0);
 			vector<int> ACnt(NumPop), Cnt(NumPop);
 			vector<double> P(NumPop);
@@ -1993,8 +1987,9 @@ COREARRAY_DLL_EXPORT SEXP gnrFst(SEXP Pop, SEXP nPop, SEXP Method)
 			}
 			UNPROTECT(2);
 
-		} else {
-			// W&C84
+		} else if (strcmp(MetText, "W&C84") == 0)
+		{
+			// Weir & Cockerham, 1984
 			vector<int> ACnt(NumPop), Cnt(NumPop);
 			vector<double> P(NumPop);
 			double Numerator=0, Denominator=0;
@@ -2052,7 +2047,9 @@ COREARRAY_DLL_EXPORT SEXP gnrFst(SEXP Pop, SEXP nPop, SEXP Method)
 			}
 
 			// output
-			rv_ans = ScalarReal(Numerator/Denominator);
+			PROTECT(rv_ans = NEW_LIST(1));
+			SET_ELEMENT(rv_ans, 0, ScalarReal(Numerator/Denominator));
+			UNPROTECT(1);
 		}
 
 	COREARRAY_CATCH

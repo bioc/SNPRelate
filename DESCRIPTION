@@ -2,14 +2,17 @@ Package: SNPRelate
 Type: Package
 Title: Parallel computing toolset for relatedness and principal
         component analysis of SNP data
-Version: 1.0.0
-Date: 2014-09-30
-Depends: R (>= 2.14), gdsfmt (>= 1.1.0)
+Version: 1.0.1
+Date: 2015-01-14
+Depends: R (>= 2.14), gdsfmt (>= 1.2.2)
 LinkingTo: gdsfmt
-Suggests: parallel, RUnit, lattice, BiocGenerics
-Author: Xiuwen Zheng, Stephanie M. Gogarten
-Maintainer: Xiuwen Zheng <zhengx@u.washington.edu>
-BugReports: http://github.com/zhengxwen/SNPRelate/issues
+Suggests: parallel, RUnit, lattice, BiocStyle, BiocGenerics, knitr
+Authors@R: c(person("Xiuwen", "Zheng", role=c("aut", "cre"),
+        email="zhengx@u.washington.edu"),
+        person("Stephanie", "Gogarten", role="ctb"),
+        person("Cathy", "Laurie", role="ctb"),
+        person("Bruce", "Weir", role=c("ctb", "ths"),
+        email="bsweir@u.washington.edu"))
 Description: Genome-wide association studies (GWAS) are widely used to
         investigate the genetic basis of diseases and traits, but they
         pose many computational challenges. We developed an R package
@@ -23,9 +26,11 @@ Description: Genome-wide association studies (GWAS) are widely used to
         multiprocessing computer architectures: Principal Component
         Analysis (PCA) and relatedness analysis using
         Identity-By-Descent measures. The SNP format in this package is
-        also being used by the GWASTools package with the support of S4
+        also used by the GWASTools package with the support of S4
         classes and generic functions.
 License: GPL-3
+VignetteBuilder: knitr
 URL: http://github.com/zhengxwen/SNPRelate,
         http://corearray.sourceforge.net/tutorials/SNPRelate/
-biocViews: Infrastructure, StatisticalMethod, Genetics
+BugReports: http://github.com/zhengxwen/SNPRelate/issues
+biocViews: Infrastructure, Genetics, StatisticalMethod, PrincipalComponent

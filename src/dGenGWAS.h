@@ -10,6 +10,7 @@
 // Version     : 1.0.0.0
 // Copyright   : Xiuwen Zheng (GPL v3.0)
 // Created     : 04/22/2012
+// Modified    : 12/12/2014
 // Description :
 // ===========================================================
 
@@ -33,7 +34,7 @@ namespace GWAS
 	using namespace CoreArray;
 
 
-	// ===========================================================
+	// ===================================================================== //
 
 	/** return the number of valid SNP genotypes
 	 *  \param pGeno    the pointer to SNP genotype array
@@ -145,8 +146,9 @@ namespace GWAS
 			long _bufsize=0);
 		~CdBufSpace();
 
-		C_UInt8 * ReadGeno(long idx);
-		C_UInt8 * ReadPackedGeno(long idx, C_UInt8 *out_buf);
+		C_UInt8 *ReadGeno(long idx);
+		C_UInt8 *ReadPackedGeno(long idx, C_UInt8 *out_buf);
+		C_UInt8 *ReadPackedGeno4b(long idx, C_UInt8 *out_buf);
 
 		inline CdGenoWorkSpace &Space() { return *fSpace; }
 		inline bool ifSNP() const { return fSNPorSamp; }
@@ -211,14 +213,26 @@ namespace GWAS
 	};
 
 
-	// ===========================================================
+	// ===================================================================== //
 
-	/// four genotypes are packed into one byte
-	COREARRAY_DLL_LOCAL C_UInt8 *PackGenotypes(const C_UInt8 *src,
-		long cnt, C_UInt8 *dest);
+	/// Four SNP genotypes are packed into one byte
+	/** (s7,s6,s5,s4,s3,s2,s1,s0):
+	 *    genotype 1: (s1,s0), genotype 2: (s3,s2),
+	 *    genotype 3: (s5,s4), genotype 4: (s7,s6)
+	**/
+	COREARRAY_DLL_LOCAL C_UInt8 *PackGeno2b(const C_UInt8 *src,
+		size_t cnt, C_UInt8 *dest);
+
+	/// Two SNP genotypes are packed into one byte
+	/** (s7,s6,s5,s4,s3,s2,s1,s0):
+	 *    genotype 1: (s3,s2,s1,s0), s2 = s3 = 0,
+	 *    genotype 2: (s7,s6,s5,s4), s6 = s7 = 0
+	**/
+	COREARRAY_DLL_LOCAL C_UInt8 *PackGeno4b(const C_UInt8 *src,
+		size_t cnt, C_UInt8 *dest);
 
 
-	// ===========================================================
+	// ===================================================================== //
 
 	/// The basic class for progress object
 	class COREARRAY_DLL_LOCAL CdProgression
@@ -250,7 +264,7 @@ namespace GWAS
 	};
 
 
-	// ===========================================================
+	// ===================================================================== //
 
 	/// get a string of current time
 	COREARRAY_DLL_LOCAL std::string NowDateToStr();
@@ -477,10 +491,13 @@ namespace GWAS
 #endif
 
 
-	// ===========================================================
 
-	/// The number of SNPs in a block, the number of samples in a block
-	extern long BlockSNP, BlockSamp;
+	// ===================================================================== //
+
+	/// The number of SNPs in a block, optimized for memory cache
+	extern long BlockNumSNP;
+	/// The number of samples in a block
+	extern long BlockSamp;
 	/// The mutex object for the variable "Progress" and the function "RequireWork"
 	extern PdThreadMutex _Mutex;
 	/// The starting point of SNP, used in the function "RequireWork"
@@ -515,7 +532,8 @@ namespace GWAS
 		long &_SampStart, long &_SampLen, bool SNPOrder);
 
 
-	// ===========================================================
+
+	// ===================================================================== //
 
 	class COREARRAY_DLL_LOCAL CMultiCoreWorkingGeno
 	{
@@ -581,11 +599,31 @@ namespace GWAS
 	extern CMultiCoreWorkingGeno MCWorkingGeno;
 
 
-	/// detect the argument 'verbose'
+
+	/// Detect the argument 'verbose'
 	COREARRAY_DLL_LOCAL bool SEXP_Verbose(SEXP Verbose);
 
 	///
 	COREARRAY_DLL_LOCAL void CachingSNPData(const char *Msg, bool Verbose);
+
+
+	/** Detect the optimized number of SNPs in a block according to
+	 *    L2 and L3 cache memory, and the value is assigned to 'BlockNumSNP'
+	**/
+	void DetectOptimizedNumOfSNP(int nSamp, size_t need);
+
+
+	/// Thread variables
+	const int N_MAX_THREAD = 256;
+
+	extern IdMatTri Array_Thread_MatIdx[N_MAX_THREAD];
+	extern C_Int64 Array_Thread_MatCnt[N_MAX_THREAD];
+
+
+	/// The packed genotype buffer
+	extern std::vector<C_UInt8> Array_PackedGeno;
+	/// The allele frequencies
+	extern std::vector<double> Array_AlleleFreq;
 }
 
 #endif /* _HEADER_GWAS_ */

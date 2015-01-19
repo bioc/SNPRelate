@@ -6,7 +6,8 @@
 #     A High-performance Computing Toolset for Relatedness and
 # Principal Component Analysis of SNP Data
 #
-# Copyright (C) 2011 - 2014        Xiuwen Zheng
+# Copyright (C) 2011 - 2015        Xiuwen Zheng
+# License: GPL-3
 # Email: zhengxwen@gmail.com
 #
 
@@ -170,8 +171,10 @@ snpgdsLDpruning <- function(gdsobj, sample.id=NULL, snp.id=NULL,
 
     if (is.numeric(chr))
         chrset <- setdiff(unique(chr), c(0, NA))
-    else
+    else if (is.character(chr))
         chrset <- setdiff(unique(chr), c("", NA))
+    else
+        stop("Unknown format of 'snp.chromosome'!")
 
     for (ch in chrset)
     {
