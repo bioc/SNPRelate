@@ -2,8 +2,8 @@ Package: SNPRelate
 Type: Package
 Title: Parallel Computing Toolset for Relatedness and Principal Component
         Analysis of SNP Data
-Version: 1.4.1
-Date: 2016-01-05
+Version: 1.4.2
+Date: 2016-01-17
 Depends: R (>= 2.14), gdsfmt (>= 1.5.9)
 LinkingTo: gdsfmt
 Suggests: parallel, RUnit, knitr, MASS, BiocGenerics
