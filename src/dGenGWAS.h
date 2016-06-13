@@ -2,7 +2,7 @@
 //
 // dGenGWAS.h: Workspace of Genome-Wide Association Studies
 //
-// Copyright (C) 2011-2015    Xiuwen Zheng
+// Copyright (C) 2011-2016    Xiuwen Zheng
 //
 // This file is part of SNPRelate.
 //
@@ -28,6 +28,7 @@
 #include <string>
 #include <algorithm>
 #include <memory>
+
 
 #ifndef NO_COREARRAY_VECTORIZATION
 #   include <dVect.h>
@@ -119,6 +120,9 @@ namespace GWAS
 		void GetAlleleFreqs(double OutFreq[]);
 		void GetMinorAlleleFreqs(double OutFreq[]);
 		void GetABNumPerSNP(int AA[], int AB[], int BB[]);
+
+		/// get allele freq, minor allele freq and missing rate (AF, MAF or MR could be NULL)
+		void Get_AF_MR_perSNP(double AF[], double MAF[], double MR[]);
 
 		/** To select SNPs based on criteria, and return # of SNPs deleted
 		 *  \param remove_mono    whether remove monomorphic snps or not
@@ -264,6 +268,86 @@ namespace GWAS
 	};
 
 
+	// ===================================================================== //
+
+ 	/// Progress object
+	class COREARRAY_DLL_LOCAL CProgress
+	{
+	public:
+		/// the number of characters in the progress bar
+		static const int ProgressBarNumChar = 50;
+
+		CProgress();
+		CProgress(C_Int64 count);
+
+		void Reset(C_Int64 count);
+		void Forward(C_Int64 val);
+		void ShowProgress();
+
+	protected:
+		C_Int64 fTotalCount;  ///< the total number
+		C_Int64 fCounter;  ///< the current counter
+		double _start, _step;
+		C_Int64 _hit;
+		vector< pair<double, time_t> > _timer;
+	};
+
+
+	// ===================================================================== //
+
+	/// the buffer object for SNP genotypes
+	class COREARRAY_DLL_LOCAL CGenoReadBySNP
+	{
+	public:
+		CGenoReadBySNP(CdBaseWorkSpace &space, size_t max_cnt_snp,
+			C_Int64 progress_count, bool load,
+			TTypeGenoDim dim=RDim_Sample_X_SNP);
+		~CGenoReadBySNP();
+
+		void Init();
+		bool Read(C_UInt8 *OutGeno);
+		bool Read(C_UInt8 *OutGeno, size_t &OutIdxSNP);
+		void PRead(C_Int32 SnpStart, C_Int32 SnpCount, C_UInt8 *OutGeno);
+
+		inline void ProgressForward(C_Int64 val) { fProgress.Forward(val); }
+
+		inline size_t Index() const { return fIndex; }
+		inline size_t Count() const { return fCount; }
+		inline size_t TotalCount() const { return fTotalCount; }
+		inline CProgress &Progress() { return fProgress; }
+
+	protected:
+		CdBaseWorkSpace &fSpace;
+		CProgress fProgress;
+		C_UInt8 *fBuffer;
+		TTypeGenoDim fDim;
+		size_t fIndex;  /// the current SNP index
+		size_t fCount;  /// the current SNP count
+		size_t fMaxCount;  /// the max count for each SNP read
+		size_t fTotalCount;  /// the number of selected SNPs
+	};
+
+
+	/// Four SNP genotypes are packed into one byte
+	/** (s7,s6,s5,s4,s3,s2,s1,s0):
+	 *    genotype 1: (s1,s0), genotype 2: (s3,s2),
+	 *    genotype 3: (s5,s4), genotype 4: (s7,s6)
+	**/
+	COREARRAY_DLL_LOCAL C_UInt8 *PackSNPGeno2b(C_UInt8 *p, const C_UInt8 *s,
+		size_t n);
+
+	/// Eight SNP genotypes are packed into two bytes
+	/** (s7,s6,s5,s4,s3,s2,s1,s0):
+	 *    0 -> 00, 1 -> 10, 2 -> 11, NA -> 01
+	 *    genotype 1: (p1.s0,p2.s0), genotype 2: (p1.s1,p2.s1),
+	 *    genotype 3: (p1.s2,p2.s2), genotype 4: (p1.s3,p2.s3),
+	 *    genotype 5: (p1.s4,p2.s4), genotype 6: (p1.s5,p2.s5),
+	 *    genotype 7: (p1.s6,p2.s6), genotype 8: (p1.s7,p2.s7)
+	**/
+	COREARRAY_DLL_LOCAL void PackSNPGeno1b(C_UInt8 *p1, C_UInt8 *p2,
+		const C_UInt8 *s, size_t n, size_t offset, size_t n_total);
+
+
 
 	// ===================================================================== //
 
@@ -323,6 +407,9 @@ namespace GWAS
 
 	/// get a string of current time
 	COREARRAY_DLL_LOCAL string NowDateToStr();
+
+	/// get a string of current time, return const char *
+	COREARRAY_DLL_LOCAL const char *TimeToStr();
 
 
 
@@ -409,8 +496,8 @@ namespace GWAS
 
 #ifndef NO_COREARRAY_VECTORIZATION
 
-	template<typename Tx, size_t vAlign = Vectorization::_SIMD_ALIGN_>
-	class COREARRAY_DLL_LOCAL CdMatTri
+	template<typename Tx, size_t vAlign=VEC_SIMD_ALIGN_BYTE>
+		class COREARRAY_DLL_LOCAL CdMatTri
 	{
 	public:
 		CdMatTri()
@@ -431,27 +518,27 @@ namespace GWAS
 		}
 		void Clear(const Tx val)
 		{
-        	Tx IVAL = val, *p = ptr.get();
+        	Tx IVAL = val, *p = ptr.Get();
 			for (size_t n = fN*(fN+1)/2; n > 0; n--)
 				*p++ = IVAL;
 		}
 		void GetRow(Tx *outbuf, size_t i)
 		{
 			for (size_t j = 0; j < i; j++)
-				outbuf[j] = ptr.get()[i + j*(2*fN-j-1)/2];
+				outbuf[j] = ptr[i + j*(2*fN-j-1)/2];
 			for (size_t j = i; j < fN; j++)
-				outbuf[j] = ptr.get()[j + i*(2*fN-i-1)/2];
+				outbuf[j] = ptr[j + i*(2*fN-i-1)/2];
 		}
 		Tx Trace()
 		{
-			Tx rv = 0, *p = ptr.get();
+			Tx rv = 0, *p = ptr.Get();
 			size_t n = fN;
 			while (n > 0) { rv += *p; p += n; n--; }
 			return rv;
 		}
 		Tx Sum()
 		{
-			Tx rv = 0, *p = ptr.get();
+			Tx rv = 0, *p = ptr.Get();
 			size_t n = Size();
 			while (n--) rv += *p++;
 			return rv;
@@ -474,18 +561,18 @@ namespace GWAS
 			}
 		}
 
-		inline Tx *get() { return ptr.get(); }
+		inline Tx *Get() { return ptr.Get(); }
 		inline size_t N() const { return fN; }
 		inline size_t Size() const { return fN*(fN+1)/2; }
 
 	protected:
-		CoreArray::Vectorization::TdAlignPtr<Tx, vAlign> ptr;
+		Vectorization::VEC_AUTO_PTR<Tx, vAlign> ptr;
 		size_t fN;
 	};
 
 
-	template<typename Tx, size_t vAlign = Vectorization::_SIMD_ALIGN_>
-	class COREARRAY_DLL_LOCAL CdMatTriDiag
+	template<typename Tx, size_t vAlign=VEC_SIMD_ALIGN_BYTE>
+		class COREARRAY_DLL_LOCAL CdMatTriDiag
 	{
 	public:
 		CdMatTriDiag()
@@ -508,7 +595,7 @@ namespace GWAS
 		}
 		void Clear(const Tx val)
 		{
-			Tx IVAL = val, *p = ptr.get();
+			Tx IVAL = val, *p = ptr.Get();
 			fDiag = IVAL;
 			for (size_t n = fN*(fN-1)/2; n > 0; n--)
 				*p++ = IVAL;
@@ -516,10 +603,10 @@ namespace GWAS
 		void GetRow(Tx *outbuf, size_t i)
 		{
 			for (size_t j = 0; j < i; j++)
-				outbuf[j] = ptr.get()[TriPtr(i-1, j, fN-1)];
+				outbuf[j] = ptr[TriPtr(i-1, j, fN-1)];
 			outbuf[i] = fDiag;
 			for (size_t j = i+1; j < fN; j++)
-				outbuf[j] = ptr.get()[TriPtr(j-1, i, fN-1)];
+				outbuf[j] = ptr[TriPtr(j-1, i, fN-1)];
 		}
 		size_t Index(size_t row, size_t col)
 		{
@@ -529,13 +616,13 @@ namespace GWAS
 			return TriPtr(col-1, row, fN-1);
 		}
 
-		inline Tx *get() { return ptr.get(); }
+		inline Tx *Get() { return ptr.Get(); }
 		inline size_t N() const { return fN; }
 		inline size_t Size() const { return fN*(fN-1)/2; }
 		inline Tx &Diag() { return fDiag; }
 
 	protected:
-		CoreArray::Vectorization::TdAlignPtr<Tx, vAlign> ptr;
+		Vectorization::VEC_AUTO_PTR<Tx, vAlign> ptr;
 		size_t fN;
 		Tx fDiag;
 		inline size_t TriPtr(size_t i1, size_t i2, size_t n)
@@ -683,7 +770,6 @@ namespace GWAS
 		C_Int64 outStart[], C_Int64 outCount[]);
 
 
-
 	// ===================================================================== //
 
 	class COREARRAY_DLL_LOCAL CSummary_AvgSD
@@ -705,6 +791,9 @@ namespace GWAS
 
 	// ===================================================================== //
 
+	/// get the list element named str, or return R_NilValue
+	COREARRAY_DLL_LOCAL SEXP RGetListElement(SEXP list, const char *name);
+
 	/// Detect the argument 'verbose'
 	COREARRAY_DLL_LOCAL bool SEXP_Verbose(SEXP Verbose);
 
@@ -716,6 +805,10 @@ namespace GWAS
 	 *    L2 and L3 cache memory, and the value is assigned to 'BlockNumSNP'
 	**/
 	void DetectOptimizedNumOfSNP(int nSamp, size_t atleast);
+
+
+	size_t GetOptimzedCache();
+
 
 
 	/// The packed genotype buffer

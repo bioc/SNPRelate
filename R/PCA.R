@@ -6,7 +6,7 @@
 #     A High-performance Computing Toolset for Relatedness and
 # Principal Component Analysis of SNP Data
 #
-# Copyright (C) 2011 - 2015        Xiuwen Zheng
+# Copyright (C) 2011 - 2016        Xiuwen Zheng
 # License: GPL-3
 # Email: zhengxwen@gmail.com
 #
@@ -22,8 +22,11 @@
 
 snpgdsPCA <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     autosome.only=TRUE, remove.monosnp=TRUE, maf=NaN, missing.rate=NaN,
-    eigen.cnt=32L, num.thread=1L, bayesian=FALSE, need.genmat=FALSE,
-    genmat.only=FALSE, eigen.method=c("DSPEVX", "DSPEV"), verbose=TRUE)
+    algorithm=c("exact", "randomized"),
+    eigen.cnt=ifelse(identical(algorithm, "randomized"), 16L, 32L),
+    num.thread=1L, bayesian=FALSE, need.genmat=FALSE,
+    genmat.only=FALSE, eigen.method=c("DSPEVX", "DSPEV"),
+    aux.dim=eigen.cnt*2L, iter.num=10L, verbose=TRUE)
 {
     # check
     ws <- .InitFile2(
@@ -37,22 +40,38 @@ snpgdsPCA <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     stopifnot(is.logical(bayesian))
     stopifnot(is.logical(need.genmat))
     stopifnot(is.logical(genmat.only))
+    algorithm <- match.arg(algorithm)
 
     if (genmat.only) need.genmat <- TRUE
     if (eigen.cnt <= 0L) eigen.cnt <- ws$n.samp
 
-	eigen.method <- match.arg(eigen.method)
+    eigen.method <- match.arg(eigen.method)
+    covalg <- "arith"
 
     # call parallel PCA
-    rv <- .Call(gnrPCA, eigen.cnt, ws$num.thread, bayesian, need.genmat,
-        genmat.only, eigen.method, verbose)
+    param <- list(bayesian=bayesian, need.genmat=need.genmat,
+        genmat.only=genmat.only, eigen.method=eigen.method, covalg=covalg,
+        aux.dim=aux.dim, iter.num=iter.num)
+    if (algorithm == "randomized")
+        param$aux.mat <- rnorm(aux.dim * ws$n.samp)
+    rv <- .Call(gnrPCA, eigen.cnt, algorithm, ws$num.thread, param, verbose)
 
     # return
-    rv <- list(sample.id = ws$sample.id, snp.id = ws$snp.id,
-        eigenval = rv[[3]], eigenvect = rv[[4]],
-        varprop = rv[[3]] / rv[[5]],
-        TraceXTX = rv[[1]], Bayesian = bayesian, genmat = rv[[2]])
-    class(rv) <- "snpgdsPCAClass"
+    if (algorithm == "exact")
+    {
+        rv <- list(sample.id = ws$sample.id, snp.id = ws$snp.id,
+            eigenval = rv[[3L]], eigenvect = rv[[4L]],
+            varprop = rv[[3L]] / rv[[5L]],
+            TraceXTX = rv[[1L]], Bayesian = bayesian, genmat = rv[[2L]])
+        class(rv) <- "snpgdsPCAClass"
+    } else if (algorithm == "randomized")
+    {
+        rv <- list(sample.id = ws$sample.id, snp.id = ws$snp.id,
+            eigenval = rv[[1L]], eigenvect = t(rv[[2]][seq_len(eigen.cnt), ]),
+            varprop = NaN,
+            TraceXTX = NaN, Bayesian = FALSE)
+        class(rv) <- "snpgdsPCAClass"
+    }
     return(rv)
 }
 
@@ -70,7 +89,7 @@ snpgdsPCACorr <- function(pcaobj, gdsobj, snp.id=NULL, eig.which=NULL,
     ws <- .InitFile(gdsobj, sample.id=pcaobj$sample.id, snp.id=snp.id,
         with.id=TRUE)
 
-    stopifnot(is.numeric(num.thread) & (num.thread>0))
+    stopifnot(is.numeric(num.thread), num.thread>0L)
     if (length(pcaobj$sample.id) != nrow(pcaobj$eigenvect))
     {
         stop("Internal error: ",
@@ -90,7 +109,7 @@ snpgdsPCACorr <- function(pcaobj, gdsobj, snp.id=NULL, eig.which=NULL,
 
     if (verbose)
     {
-        cat("SNP correlations:\n")
+        cat("SNP correlation:\n")
         cat("Working space:", ws$n.samp, "samples,", ws$n.snp, "SNPs\n");
         if (num.thread <= 1)
             cat("\tUsing", num.thread, "(CPU) core.\n")
