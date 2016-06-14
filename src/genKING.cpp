@@ -227,7 +227,7 @@ public:
 		AF_1_AF_2.Reset(nBlock);
 
 		// genotype buffer, false for no memory buffer
-		CGenoReadBySNP WS(Space, nBlock, verbose ? -1 : 0, false);
+		CGenoReadBySNP WS(NumThread, Space, nBlock, verbose ? -1 : 0, false);
 
 		// for-loop
 		WS.Init();
@@ -450,7 +450,7 @@ public:
 		VEC_AUTO_PTR<C_UInt8> Geno(nSamp * nBlock);
 
 		// genotype buffer, false for no memory buffer
-		CGenoReadBySNP WS(Space, nBlock, verbose ? -1 : 0, false);
+		CGenoReadBySNP WS(NumThread, Space, nBlock, verbose ? -1 : 0, false);
 
 		// for-loop
 		WS.Init();
@@ -530,7 +530,7 @@ COREARRAY_DLL_EXPORT SEXP gnrIBD_KING_Homo(SEXP NumThread, SEXP _Verbose)
 		SET_ELEMENT(rv_ans, 1, K1);
 
 		if (verbose)
-			Rprintf("%s    Done\n", TimeToStr());
+			Rprintf("%s    Done.\n", TimeToStr());
 		UNPROTECT(3);
 
 	COREARRAY_CATCH
@@ -591,7 +591,7 @@ COREARRAY_DLL_EXPORT SEXP gnrIBD_KING_Robust(SEXP FamilyID, SEXP NumThread,
 		SET_ELEMENT(rv_ans, 1, Kinship);
 
 		if (verbose)
-			Rprintf("%s    Done\n", TimeToStr());
+			Rprintf("%s    Done.\n", TimeToStr());
 		UNPROTECT(3);
 
 	COREARRAY_CATCH
