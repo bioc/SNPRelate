@@ -111,11 +111,9 @@ snpgdsPCACorr <- function(pcaobj, gdsobj, snp.id=NULL, eig.which=NULL,
     {
         cat("SNP correlation:\n")
         cat("Working space:", ws$n.samp, "samples,", ws$n.snp, "SNPs\n");
-        if (num.thread <= 1)
-            cat("\tUsing", num.thread, "(CPU) core.\n")
-        else
-            cat("\tUsing", num.thread, "(CPU) cores.\n")
-        cat("\tUsing the top", dim(pcaobj$eigenvect)[2], "eigenvectors.\n")
+        cat("    using ", num.thread, " (CPU) core", .plural(num.thread), "\n",
+            sep="")
+        cat("    using the top", dim(pcaobj$eigenvect)[2], "eigenvectors\n")
     }
 
     # call C function
@@ -144,11 +142,9 @@ snpgdsPCASNPLoading <- function(pcaobj, gdsobj, num.thread=1L, verbose=TRUE)
     {
         cat("SNP loading:\n")
         cat("Working space:", ws$n.samp, "samples,", ws$n.snp, "SNPs\n");
-        if (num.thread <= 1)
-            cat("\tUsing", num.thread, "(CPU) core.\n")
-        else
-            cat("\tUsing", num.thread, "(CPU) cores.\n")
-        cat("\tUsing the top", dim(pcaobj$eigenvect)[2], "eigenvectors.\n")
+        cat("    using ", num.thread, " (CPU) core", .plural(num.thread), "\n",
+            sep="")
+        cat("    using the top", dim(pcaobj$eigenvect)[2], "eigenvectors\n")
     }
 
     # call parallel PCA
@@ -190,11 +186,9 @@ snpgdsPCASampLoading <- function(loadobj, gdsobj, sample.id=NULL,
     {
         cat("Sample loading:\n")
         cat("Working space:", ws$n.samp, "samples,", ws$n.snp, "SNPs\n")
-        if (num.thread <= 1)
-            cat("\tUsing", num.thread, "(CPU) core.\n")
-        else
-            cat("\tUsing", num.thread, "(CPU) cores.\n")
-        cat("\tUsing the top", eigcnt, "eigenvectors.\n")
+        cat("    using ", num.thread, " (CPU) core", .plural(num.thread), "\n",
+            sep="")
+        cat("    using the top", eigcnt, "eigenvectors\n")
     }
 
     # call C function
@@ -334,4 +328,31 @@ snpgdsAdmixProp <- function(eigobj, groups, bound=FALSE)
     }
 
     new.p
+}
+
+
+
+#######################################################################
+# plot PCA results
+#
+
+plot.snpgdsPCAClass <- function(x, eig=c(1L,2L), ...)
+{
+    stopifnot(inherits(x, "snpgdsPCAClass"))
+    stopifnot(is.numeric(eig), length(eig) >= 2L)
+
+    if (length(eig) == 2L)
+    {
+        v <- x$varprop[eig] * 100
+        plot(x$eigenvect[,eig[1L]], x$eigenvect[,eig[2L]],
+            xlab=sprintf("Eigenvector %d (%.1f%%)", eig[1L], v[eig[1L]]),
+            ylab=sprintf("Eigenvector %d (%.1f%%)", eig[2L], v[eig[2L]]),
+            ...)
+    } else {
+        pairs(x$eigenvect[, eig],
+            labels=sprintf("Eig %d\n(%.1f%%)", eig, x$varprop[eig]*100),
+            ...)
+    }
+
+    invisible()
 }

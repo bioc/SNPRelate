@@ -518,7 +518,7 @@ snpgdsIBDSelection <- function(ibdobj, kinship.cutoff=NaN, samp.sel=NULL)
 
 snpgdsGRM <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     autosome.only=TRUE, remove.monosnp=TRUE, maf=NaN, missing.rate=NaN,
-    method=c("Visscher", "Eigenstrat", "EIGMIX", "W&Z15"), num.thread=1L,
+    method=c("GCTA", "Eigenstrat", "EIGMIX", "W&Z15"), num.thread=1L,
     with.id=TRUE, verbose=TRUE)
 {
     # check and initialize ...
@@ -577,7 +577,7 @@ snpgdsGRM <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     if (ws$verbose)
     {
         x <- table(population)
-        cat("# of Populations: ", nlevels(population), "\n\t",
+        cat("# of Populations: ", nlevels(population), "\n    ",
             paste(sprintf("%s (%d)", names(x), x), collapse=", "),
             "\n", sep="")
     }
