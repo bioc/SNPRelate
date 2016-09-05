@@ -1,5 +1,6 @@
 \name{snpgdsPCA}
 \alias{snpgdsPCA}
+\alias{plot.snpgdsPCAClass}
 \title{
     Principal Component Analysis (PCA) on SNP genotype data
 }
@@ -8,10 +9,14 @@
 analysis in GWAS.
 }
 \usage{
-snpgdsPCA(gdsobj, sample.id=NULL, snp.id=NULL, autosome.only=TRUE,
-    remove.monosnp=TRUE, maf=NaN, missing.rate=NaN, eigen.cnt=32,
-    num.thread=1L, bayesian=FALSE, need.genmat=FALSE, genmat.only=FALSE,
-    eigen.method=c("DSPEVX", "DSPEV"), verbose=TRUE)
+snpgdsPCA(gdsobj, sample.id=NULL, snp.id=NULL,
+    autosome.only=TRUE, remove.monosnp=TRUE, maf=NaN, missing.rate=NaN,
+    algorithm=c("exact", "randomized"),
+    eigen.cnt=ifelse(identical(algorithm, "randomized"), 16L, 32L),
+    num.thread=1L, bayesian=FALSE, need.genmat=FALSE,
+    genmat.only=FALSE, eigen.method=c("DSPEVX", "DSPEV"),
+    aux.dim=eigen.cnt*2L, iter.num=10L, verbose=TRUE)
+\method{plot}{snpgdsPCAClass}(x, eig=c(1L,2L), ...)
 }
 \arguments{
     \item{gdsobj}{an object of class \code{\link{SNPGDSFileClass}},
@@ -29,6 +34,8 @@ snpgdsPCA(gdsobj, sample.id=NULL, snp.id=NULL, autosome.only=TRUE,
         no missing threshold}
     \item{eigen.cnt}{output the number of eigenvectors; if eigen.cnt <= 0, then
         return all eigenvectors}
+    \item{algorithm}{"exact", traditional exact calculation; "randomized",
+        fast PCA with randomized algorithm introduced in Galinsky et al. 2016}
     \item{num.thread}{the number of (CPU) cores used; if \code{NA}, detect
         the number of cores automatically}
     \item{bayesian}{if TRUE, use bayesian normalization}
@@ -40,7 +47,13 @@ snpgdsPCA(gdsobj, sample.id=NULL, snp.id=NULL, autosome.only=TRUE,
         compatible with SNPRelate_1.1.6 or earlier, using LAPACK::DSPEV;
         "DSPEVX" is significantly faster than "DSPEV" if only top principal
         components are of interest}
+    \item{aux.dim}{auxiliary dimension used in fast randomized algorithm}
+    \item{iter.num}{iteration number used in fast randomized algorithm}
     \item{verbose}{if TRUE, show information}
+    \item{x}{a \code{snpgdsPCAClass} object}
+    \item{eig}{indices of eigenvectors, like \code{1:2} or \code{1:4}}
+    \item{...}{the arguments passed to or from other methods, like
+        \code{pch}, \code{col}}
 }
 \details{
     The minor allele frequency and missing rate for each SNP passed in
@@ -58,8 +71,13 @@ snpgdsPCA(gdsobj, sample.id=NULL, snp.id=NULL, autosome.only=TRUE,
     \item{genmat}{the genetic covariance matrix}
 }
 \references{
-    Patterson, N., Price, A. L. & Reich, D.
-    Population structure and eigenanalysis. PLoS Genet. 2, e190 (2006).
+    Patterson N, Price AL, Reich D. Population structure and eigenanalysis.
+PLoS Genet. 2006 Dec;2(12):e190.
+
+	Galinsky KJ, Bhatia G, Loh PR, Georgiev S, Mukherjee S, Patterson NJ,
+Price AL. Fast Principal-Component Analysis Reveals Convergent Evolution of
+ADH1B in Europe and East Asia. Am J Hum Genet. 2016 Mar 3;98(3):456-72.
+doi: 10.1016/j.ajhg.2015.12.022. Epub 2016 Feb 25.
 }
 \author{Xiuwen Zheng}
 \seealso{
@@ -80,6 +98,10 @@ head(RV$eigenval)
 # variance proportion (%)
 head(round(RV$varprop*100, 2))
 # [1] 12.23  5.84  1.01  0.95  0.84  0.74
+
+
+plot(RV)
+plot(RV, 1:4)
 
 
 ####  there is no population information  ####

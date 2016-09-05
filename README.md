@@ -19,18 +19,18 @@ The GDS format offers the efficient operations specifically designed for integer
 
 ## Bioconductor:
 
-Release Version: v1.4.2
+Release Version: v1.6.4
 
 [http://www.bioconductor.org/packages/release/bioc/html/SNPRelate.html](http://www.bioconductor.org/packages/release/bioc/html/SNPRelate.html)
 
-Development Version: v1.5.2
+Development Version: v1.7.2
 
 [http://www.bioconductor.org/packages/devel/bioc/html/SNPRelate.html](http://www.bioconductor.org/packages/devel/bioc/html/SNPRelate.html)
 
 
 ## News
 
-* Supports the [SeqArray](http://bioconductor.org/packages/release/bioc/html/SeqArray.html) GDS format, see [the vignette](http://www.bioconductor.org/packages/devel/bioc/vignettes/SeqArray/inst/doc/AnalysisTutorial.html).
+* Supports the [SeqArray](http://bioconductor.org/packages/release/bioc/html/SeqArray.html) GDS format, see [the vignette](http://www.bioconductor.org/packages/release/bioc/vignettes/SeqArray/inst/doc/R_Integration.html#integration-with-snprelate).
 
 
 ## Tutorials
@@ -79,7 +79,7 @@ R CMD INSTALL SNPRelate_latest.tar.gz
 ```
 
 
-* Old version (<=v0.9.19) from [R-Forge](http://R-Forge.R-project.org) repository:
+* Old version (<= v0.9.19) from [R-Forge](http://R-Forge.R-project.org) repository:
 ```R
 install.packages("gdsfmt", repos="http://R-Forge.R-project.org")
 install.packages("SNPRelate", repos="http://R-Forge.R-project.org")

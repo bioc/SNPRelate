@@ -2,7 +2,7 @@
 //
 // genSlideWin.cpp: The Method of Sliding Windows
 //
-// Copyright (C) 2015    Xiuwen Zheng
+// Copyright (C) 2015-2016    Xiuwen Zheng
 //
 // This file is part of SNPRelate.
 //
@@ -19,8 +19,8 @@
 // with SNPRelate.
 // If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef _HEADER_FST_
-#define _HEADER_FST_
+#ifndef _HEADER_SLIDE_WINDOW_
+#define _HEADER_SLIDE_WINDOW_
 
 // CoreArray library header
 #include "dGenGWAS.h"
@@ -159,8 +159,7 @@ COREARRAY_DLL_EXPORT SEXP gnrSlidingWindow(SEXP FUNIdx, SEXP WinSize,
 	bool verbose = (Rf_asLogical(Verbose) == TRUE);
 	if (verbose)
 		Rprintf(", %d windows\n", nWin);
-	CdProgression Progress(1, verbose);
-	Progress.Init(nWin, true);
+	CProgress Progress(verbose ? nWin : 0);
 
 	// get the parameter
 	SEXP PL[64];
@@ -332,4 +331,4 @@ COREARRAY_DLL_EXPORT SEXP gnrSlidingWindow(SEXP FUNIdx, SEXP WinSize,
 
 }
 
-#endif  /* _HEADER_FST_ */
+#endif  /* _HEADER_SLIDE_WINDOW_ */

@@ -9,7 +9,7 @@
 // SNPRelate.cpp: Relatedness, Linkage Disequilibrium and
 //				  Principal Component Analysis
 //
-// Copyright (C) 2011 - 2016	Xiuwen Zheng [zhengxwen@gmail.com]
+// Copyright (C) 2011-2016    Xiuwen Zheng [zhengxwen@gmail.com]
 //
 // This file is part of SNPRelate.
 //
@@ -44,7 +44,7 @@
 
 using namespace std;
 using namespace CoreArray;
-using namespace CoreArray::Vectorization;
+using namespace Vectorization;
 using namespace GWAS;
 
 
@@ -192,7 +192,7 @@ COREARRAY_DLL_EXPORT SEXP gnrSelSNP_Base(SEXP remove_mono, SEXP maf,
 		const R_xlen_t n = MCWorkingGeno.Space().SNPNum();
 		vector<C_BOOL> sel(n);
 		int OutNum = MCWorkingGeno.Space().Select_SNP_Base(
-			RM_MONO == TRUE, MAF, MRATE, &sel[0]);
+			RM_MONO==TRUE, MAF, MRATE, &sel[0]);
 
 		rv_ans = PROTECT(NEW_LIST(2));
 		SET_ELEMENT(rv_ans, 0, ScalarInteger(OutNum));
@@ -243,21 +243,18 @@ COREARRAY_DLL_EXPORT SEXP gnrSelSNP_Base_Ex(SEXP afreq, SEXP remove_mono,
 COREARRAY_DLL_EXPORT SEXP gnrSNPRateFreq()
 {
 	COREARRAY_TRY
-		R_xlen_t L = MCWorkingGeno.Space().SNPNum();
+		R_xlen_t n = MCWorkingGeno.Space().SNPNum();
+
 		SEXP AF, MF, MR;
 		PROTECT(rv_ans = NEW_LIST(3));
-		PROTECT(AF = NEW_NUMERIC(L));
+		PROTECT(AF = NEW_NUMERIC(n));
 		SET_ELEMENT(rv_ans, 0, AF);
-		PROTECT(MF = NEW_NUMERIC(L));
+		PROTECT(MF = NEW_NUMERIC(n));
 		SET_ELEMENT(rv_ans, 1, MF);
-		PROTECT(MR = NEW_NUMERIC(L));
+		PROTECT(MR = NEW_NUMERIC(n));
 		SET_ELEMENT(rv_ans, 2, MR);
 
-		MCWorkingGeno.Space().GetAlleleFreqs(REAL(AF));
-		double *pAF = REAL(AF), *pMF = REAL(MF);
-		for (R_xlen_t i=0; i < L; i++)
-			pMF[i] = min(pAF[i], 1 - pAF[i]);
-		MCWorkingGeno.Space().GetMissingRates(REAL(MR));
+		MCWorkingGeno.Space().Get_AF_MR_perSNP(REAL(AF), REAL(MF), REAL(MR));
 
 		UNPROTECT(4);
 	COREARRAY_CATCH
@@ -1179,10 +1176,10 @@ COREARRAY_DLL_EXPORT void R_init_SNPRelate(DllInfo *info)
 	extern SEXP gnrLDpruning(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 	extern SEXP gnrSlidingNumWin(SEXP, SEXP, SEXP, SEXP);
 	extern SEXP gnrSlidingWindow(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-	extern SEXP gnrPairScore(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+	extern SEXP gnrPairScore(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 	extern SEXP gnrPairIBD(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 	extern SEXP gnrPairIBDLogLik(SEXP, SEXP, SEXP, SEXP, SEXP);
-	extern SEXP gnrPCA(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+	extern SEXP gnrPCA(SEXP, SEXP, SEXP, SEXP, SEXP);
 	extern SEXP gnrPCACorr(SEXP, SEXP, SEXP, SEXP);
 	extern SEXP gnrPCASampLoading(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 	extern SEXP gnrPCASNPLoading(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -1223,9 +1220,9 @@ COREARRAY_DLL_EXPORT void R_init_SNPRelate(DllInfo *info)
 		CALL(gnrIndInb, 4),              CALL(gnrIndInbCoef, 3),
 		CALL(gnrSSEFlag, 0),             CALL(gnrLDMat, 5),
 		CALL(gnrLDpair, 3),              CALL(gnrLDpruning, 6),
-		CALL(gnrPairScore, 6),
+		CALL(gnrPairScore, 7),
 		CALL(gnrPairIBD, 8),             CALL(gnrPairIBDLogLik, 5),
-		CALL(gnrPCA, 7),                 CALL(gnrPCACorr, 4),
+		CALL(gnrPCA, 5),                 CALL(gnrPCACorr, 4),
 		CALL(gnrPCASampLoading, 9),      CALL(gnrPCASNPLoading, 7),
 
 		CALL(gnrParseGEN, 9),            CALL(gnrParsePED, 8),
