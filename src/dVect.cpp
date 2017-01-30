@@ -2,7 +2,7 @@
 //
 // dVect.cpp: Classess and functions for vectorization
 //
-// Copyright (C) 2007-2016    Xiuwen Zheng
+// Copyright (C) 2007-2017    Xiuwen Zheng
 //
 // This file is part of SNPRelate.
 //
@@ -734,7 +734,7 @@ COREARRAY_DLL_DEFAULT C_UInt8* vec_u8_geno_count(C_UInt8 *p,
 }
 
 
-/// any (*p > 2) is set to be 3
+// any (*p > 2) is set to be 3
 COREARRAY_DLL_DEFAULT void vec_u8_geno_valid(C_UInt8 *p, size_t n)
 {
 #if defined(COREARRAY_SIMD_SSE2)
@@ -758,6 +758,80 @@ COREARRAY_DLL_DEFAULT void vec_u8_geno_valid(C_UInt8 *p, size_t n)
 #endif
 
 	for (; n > 0; n--, p++) if (*p > 3) *p = 3;
+}
+
+
+// add *p by v and applied to all n
+COREARRAY_DLL_DEFAULT void vec_i32_add(C_Int32 *p, size_t n, C_Int32 v)
+{
+	for (; n > 0; n--) *p++ += v;
+}
+
+
+// add *p by v and applied to all n
+COREARRAY_DLL_DEFAULT void vec_f64_add(double *p, size_t n, double v)
+{
+#if defined(COREARRAY_SIMD_AVX)
+
+	__m256d v4 = _mm256_set1_pd(v);
+	switch ((size_t)p & 0x1F)
+	{
+	case 0x08:
+		if (n > 0) { (*p++) += v; n--; }
+	case 0x10:
+		if (n > 0) { (*p++) += v; n--; }
+	case 0x18:
+		if (n > 0) { (*p++) += v; n--; }
+	case 0x00:
+		for (; n >= 4; n-=4)
+		{
+			_mm256_store_pd(p, _mm256_add_pd(_mm256_load_pd(p), v4));
+			p += 4;
+		}
+		if (n >= 2)
+		{
+			_mm_store_pd(p, _mm_add_pd(_mm_load_pd(p), _mm256_castpd256_pd128(v4)));
+			p += 2; n -= 2;
+		}
+		break;
+	default:
+		for (; n >= 4; n-=4)
+		{
+			_mm256_storeu_pd(p, _mm256_add_pd(_mm256_loadu_pd(p), v4));
+			p += 4;
+		}
+		if (n >= 2)
+		{
+			_mm_storeu_pd(p, _mm_add_pd(_mm_loadu_pd(p), _mm256_castpd256_pd128(v4)));
+			p += 2; n -= 2;
+		}
+	}
+
+#elif defined(COREARRAY_SIMD_SSE2)
+
+	__m128d v2 = _mm_set1_pd(v);
+	switch ((size_t)p & 0x0F)
+	{
+	case 0x08:
+		if (n > 0) { (*p++) += v; n--; }
+	case 0x00:
+		for (; n >= 2; n-=2)
+		{
+			_mm_store_pd(p, _mm_add_pd(_mm_load_pd(p), v2));
+			p += 2;
+		}
+		break;
+	default:
+		for (; n >= 2; n-=2)
+		{
+			_mm_storeu_pd(p, _mm_add_pd(_mm_loadu_pd(p), v2));
+			p += 2;
+		}
+	}
+
+#endif
+
+	for (; n > 0; n--) (*p++) += v;
 }
 
 

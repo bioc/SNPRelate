@@ -2,7 +2,7 @@
 //
 // dVect.h: Classess and functions for vectorization
 //
-// Copyright (C) 2007-2016    Xiuwen Zheng
+// Copyright (C) 2007-2017    Xiuwen Zheng
 //
 // This file is part of SNPRelate.
 //
@@ -18,15 +18,6 @@
 // You should have received a copy of the GNU General Public
 // License along with SNPRelate.
 // If not, see <http://www.gnu.org/licenses/>.
-
-/**
- *	\file     dVect.h
- *	\author   Xiuwen Zheng [zhengxwen@gmail.com]
- *	\version  1.0
- *	\date     2007 - 2015
- *	\brief    Classess and functions for vectorization
- *	\details
-**/
 
 #ifndef _HEADER_VECTORIZATION_
 #define _HEADER_VECTORIZATION_
@@ -537,6 +528,12 @@ namespace Vectorization
 
 	/// any (*p > 3) is set to be 3
 	COREARRAY_DLL_DEFAULT void vec_u8_geno_valid(C_UInt8 *p, size_t n);
+
+	/// add *p by v and applied to all n
+	COREARRAY_DLL_DEFAULT void vec_i32_add(C_Int32 *p, size_t n, C_Int32 v);
+
+	/// add *p by v and applied to all n
+	COREARRAY_DLL_DEFAULT void vec_f64_add(double *p, size_t n, double v);
 
 	/// add *p by *s and applied to all n
 	COREARRAY_DLL_DEFAULT void vec_f64_add(double *p, const double *s, size_t n);

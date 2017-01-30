@@ -40,7 +40,8 @@ snpgdsAdmixProp(eigobj, groups, bound=FALSE)
 }
 \author{Xiuwen Zheng}
 \seealso{
-    \code{\link{snpgdsEIGMIX}}, \code{\link{snpgdsPCA}}
+    \code{\link{snpgdsEIGMIX}}, \code{\link{snpgdsPCA}},
+    \code{\link{snpgdsAdmixPlot}}
 }
 
 \examples{
@@ -91,13 +92,8 @@ abline(a=1, b=-1, col="gray25", lty=2)
 legend("topright", legend=levels(tab$pop), pch="o", col=1:4)
 
 
-
-# run eigen-analysis
-RV <- snpgdsEIGMIX(genofile, sample.id=samp.id[pop_code=="JPT"])
-z <- RV$ibdmat
-
-mean(c(z))
-mean(diag(z))
+# draw
+snpgdsAdmixPlot(prop, group=pop_code)
 
 
 # close the genotype file

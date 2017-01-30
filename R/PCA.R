@@ -41,16 +41,14 @@ snpgdsPCA <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     stopifnot(is.logical(need.genmat))
     stopifnot(is.logical(genmat.only))
     algorithm <- match.arg(algorithm)
+    eigen.method <- match.arg(eigen.method)
 
     if (genmat.only) need.genmat <- TRUE
     if (eigen.cnt <= 0L) eigen.cnt <- ws$n.samp
 
-    eigen.method <- match.arg(eigen.method)
-    covalg <- "arith"
-
     # call parallel PCA
     param <- list(bayesian=bayesian, need.genmat=need.genmat,
-        genmat.only=genmat.only, eigen.method=eigen.method, covalg=covalg,
+        genmat.only=genmat.only, eigen.method=eigen.method,
         aux.dim=aux.dim, iter.num=iter.num)
     if (algorithm == "randomized")
         param$aux.mat <- rnorm(aux.dim * ws$n.samp)
@@ -133,10 +131,12 @@ snpgdsPCACorr <- function(pcaobj, gdsobj, snp.id=NULL, eig.which=NULL,
 snpgdsPCASNPLoading <- function(pcaobj, gdsobj, num.thread=1L, verbose=TRUE)
 {
     # check
-    stopifnot(inherits(pcaobj, "snpgdsPCAClass"))
+    stopifnot(inherits(pcaobj, "snpgdsPCAClass") |
+        inherits(pcaobj, "snpgdsEigMixClass"))
     ws <- .InitFile(gdsobj, sample.id=pcaobj$sample.id, snp.id=pcaobj$snp.id)
     stopifnot(is.numeric(num.thread), num.thread > 0L)
-    stopifnot(is.logical(verbose))
+    stopifnot(is.logical(verbose), length(verbose)==1L)
+    stopifnot(!is.null(pcaobj$eigenval), !is.null(pcaobj$eigenvect))
 
     if (verbose)
     {
@@ -144,20 +144,36 @@ snpgdsPCASNPLoading <- function(pcaobj, gdsobj, num.thread=1L, verbose=TRUE)
         cat("Working space:", ws$n.samp, "samples,", ws$n.snp, "SNPs\n");
         cat("    using ", num.thread, " (CPU) core", .plural(num.thread), "\n",
             sep="")
-        cat("    using the top", dim(pcaobj$eigenvect)[2], "eigenvectors\n")
+        cat("    using the top", dim(pcaobj$eigenvect)[2L], "eigenvectors\n")
     }
 
-    # call parallel PCA
-    rv <- .Call(gnrPCASNPLoading, pcaobj$eigenval, ncol(pcaobj$eigenvect),
-        pcaobj$eigenvect, pcaobj$TraceXTX, num.thread, pcaobj$Bayesian,
-        verbose)
+    # computing SNP loading
+    if (inherits(pcaobj, "snpgdsPCAClass"))
+    {
+        # call C function
+        rv <- .Call(gnrPCASNPLoading, pcaobj$eigenval, pcaobj$eigenvect,
+            pcaobj$TraceXTX, num.thread, pcaobj$Bayesian, verbose)
+        rv <- list(sample.id=pcaobj$sample.id, snp.id=pcaobj$snp.id,
+            eigenval=pcaobj$eigenval, snploading=rv[[1L]],
+            TraceXTX=pcaobj$TraceXTX, Bayesian=pcaobj$Bayesian,
+            avgfreq=rv[[2L]], scale=rv[[3L]])
+        class(rv) <- "snpgdsPCASNPLoadingClass"
 
-    # return
-    rv <- list(sample.id=pcaobj$sample.id, snp.id=pcaobj$snp.id,
-        eigenval=pcaobj$eigenval, snploading=rv[[1]],
-        TraceXTX=pcaobj$TraceXTX, Bayesian=pcaobj$Bayesian,
-        avefreq=rv[[2]], scale=rv[[3]])
-    class(rv) <- "snpgdsPCASNPLoadingClass"
+    } else {
+        if (isTRUE(pcaobj$diagadj))
+        {
+            warning(
+    "Please run `snpgdsEIGMIX(, diagadj=FALSE)` for projecting new samples.",
+                immediate.=TRUE)
+        }
+        # call C function
+        mat <- .Call(gnrEigMixSNPLoading, pcaobj$eigenval, pcaobj$eigenvect,
+            pcaobj$afreq, num.thread, verbose)
+        rv <- list(sample.id=pcaobj$sample.id, snp.id=pcaobj$snp.id,
+            eigenval=pcaobj$eigenval, snploading=mat,
+            afreq=pcaobj$afreq)
+        class(rv) <- "snpgdsEigMixSNPLoadingClass"
+    }
     return(rv)
 }
 
@@ -171,7 +187,8 @@ snpgdsPCASampLoading <- function(loadobj, gdsobj, sample.id=NULL,
     num.thread=1L, verbose=TRUE)
 {
     # check
-    stopifnot(inherits(loadobj, "snpgdsPCASNPLoadingClass"))
+    stopifnot(inherits(loadobj, "snpgdsPCASNPLoadingClass") |
+        inherits(loadobj, "snpgdsEigMixSNPLoadingClass"))
     ws <- .InitFile(gdsobj, sample.id=sample.id, snp.id=loadobj$snp.id)
 
     sample.id <- read.gdsn(index.gdsn(gdsobj, "sample.id"))
@@ -190,21 +207,39 @@ snpgdsPCASampLoading <- function(loadobj, gdsobj, sample.id=NULL,
         cat("    using the top", eigcnt, "eigenvectors\n")
     }
 
-    # prepare post-eigenvectors
-    ss <- (length(loadobj$sample.id) - 1) / loadobj$TraceXTX
-    sqrt_eigval <- sqrt(ss / loadobj$eigenval[1:eigcnt])
-    sload <- loadobj$snploading * sqrt_eigval
+    if (inherits(loadobj, "snpgdsPCASNPLoadingClass"))
+    {
+        # prepare post-eigenvectors
+        ss <- (length(loadobj$sample.id) - 1) / loadobj$TraceXTX
+        sqrt_eigval <- sqrt(ss / loadobj$eigenval[1:eigcnt])
+        sload <- loadobj$snploading * sqrt_eigval
 
-    # call C function
-    rv <- .Call(gnrPCASampLoading, eigcnt, sload, loadobj$avefreq,
-        loadobj$scale, num.thread, verbose)
+        # call C function
+        mm <- .Call(gnrPCASampLoading, eigcnt, sload, loadobj$avgfreq,
+            loadobj$scale, num.thread, verbose)
 
-    # return
-    rv <- list(sample.id = sample.id, snp.id = loadobj$snp.id,
-        eigenval = loadobj$eigenval, eigenvect = rv,
-        TraceXTX = loadobj$TraceXTX,
-        Bayesian = loadobj$Bayesian, genmat = NULL)
-    class(rv) <- "snpgdsPCAClass"
+        # return
+        rv <- list(sample.id = sample.id, snp.id = loadobj$snp.id,
+            eigenval = loadobj$eigenval, eigenvect = mm,
+            TraceXTX = loadobj$TraceXTX,
+            Bayesian = loadobj$Bayesian, genmat = NULL)
+        class(rv) <- "snpgdsPCAClass"
+
+    } else {
+        # prepare post-eigenvectors
+        sqrt_eigval <- sqrt(1 / loadobj$eigenval[1:eigcnt])
+        sload <- loadobj$snploading * sqrt_eigval
+
+        # call C function
+        mm <- .Call(gnrEigMixSampLoading, sload, loadobj$afreq, num.thread,
+            verbose)
+
+        # return
+        rv <- list(sample.id = sample.id, snp.id = loadobj$snp.id,
+            eigenval = loadobj$eigenval, eigenvect = mm,
+            afreq = loadobj$afreq)
+        class(rv) <- "snpgdsEigMixClass"
+    }
     return(rv)
 }
 
@@ -216,8 +251,7 @@ snpgdsPCASampLoading <- function(loadobj, gdsobj, sample.id=NULL,
 
 snpgdsEIGMIX <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     autosome.only=TRUE, remove.monosnp=TRUE, maf=NaN, missing.rate=NaN,
-    num.thread=1L, eigen.cnt=32L, need.ibdmat=FALSE, ibdmat.only=FALSE,
-    verbose=TRUE)
+    num.thread=1L, eigen.cnt=32L, diagadj=TRUE, ibdmat=FALSE, verbose=TRUE)
 {
     # check and initialize ...
     ws <- .InitFile2(cmd="Eigen-analysis on genotypes:",
@@ -227,20 +261,19 @@ snpgdsEIGMIX <- function(gdsobj, sample.id=NULL, snp.id=NULL,
         verbose=verbose)
 
     stopifnot(is.numeric(eigen.cnt), length(eigen.cnt)==1L)
-    if (eigen.cnt < 1L)
+    if (eigen.cnt < 0L)
         eigen.cnt <- ws$n.samp
-
-    stopifnot(is.logical(need.ibdmat), length(need.ibdmat)==1L)
-    stopifnot(is.logical(ibdmat.only), length(ibdmat.only)==1L)
+    stopifnot(is.logical(diagadj), length(diagadj)==1L)
+    stopifnot(is.logical(ibdmat), length(ibdmat)==1L)
 
     # call eigen-analysis
-    rv <- .Call(gnrEIGMIX, eigen.cnt, ws$num.thread, need.ibdmat, ibdmat.only,
-        verbose)
+    param <- list(diagadj=diagadj, ibdmat=ibdmat)
+    rv <- .Call(gnrEigMix, eigen.cnt, ws$num.thread, param, verbose)
 
     # return
     rv <- list(sample.id = ws$sample.id, snp.id = ws$snp.id,
-        eigenval = rv$eigenval, eigenvect = rv$eigenvect,
-        ibdmat = rv$ibdmat)
+        eigenval = rv[[1L]], eigenvect = rv[[2L]], afreq = rv[[3L]],
+        ibd = rv[[4L]], diagadj=diagadj)
     class(rv) <- "snpgdsEigMixClass"
     return(rv)
 }
@@ -335,11 +368,142 @@ snpgdsAdmixProp <- function(eigobj, groups, bound=FALSE)
 
 
 
+snpgdsAdmixPlot <- function(propmat, group=NULL, col=NULL, multiplot=TRUE,
+    showgrp=TRUE, shownum=TRUE, ylim=TRUE, na.rm=TRUE)
+{
+    # check
+    stopifnot(is.numeric(propmat), is.matrix(propmat))
+    stopifnot(is.null(group) | is.vector(group) | is.factor(group))
+    if (!is.null(group))
+        stopifnot(nrow(propmat) == length(group))
+    stopifnot(is.null(col) | is.vector(col))
+    stopifnot(is.logical(multiplot), length(multiplot)==1L)
+    stopifnot(is.logical(showgrp), length(showgrp)==1L)
+    stopifnot(is.logical(shownum), length(shownum)==1L)
+    stopifnot(is.logical(ylim) | is.numeric(ylim))
+    if (is.numeric(ylim))
+        stopifnot(length(ylim) == 2L)
+    stopifnot(is.logical(na.rm), length(na.rm)==1L)
+
+    if (is.logical(ylim))
+    {
+        if (isTRUE(ylim))
+            ylim <- c(0, 1)
+        else
+            ylim <- range(propmat, na.rm=TRUE)
+    }
+
+    if (!is.null(group))
+    {
+        if (anyNA(group) & !isTRUE(na.rm))
+        {
+            group <- as.character(group)
+            group[is.na(group)] <- "<NA>"
+        }
+        grp_name <- levels(factor(group))
+        idx <- list()
+        for (n in grp_name)
+        {
+            i <- which(group == n)
+            i <- i[order(propmat[i, 1L], decreasing=TRUE)]
+            idx <- c(idx, list(i))
+        }
+        propmat <- propmat[unlist(idx), ]
+        grp_len <- lengths(idx, use.names=FALSE)
+        xl <- c(0, cumsum(grp_len))
+        x <- xl[-1L] - 0.5*grp_len
+    }
+
+    if (multiplot)
+    {
+        opar <- par(mfrow=c(ncol(propmat), 1L), mar=c(1.25, 5, 1.75, 2),
+            oma=c(0, 0, 4, 0))
+        on.exit(par(opar))
+        grp <- colnames(propmat)
+        if (is.null(grp))
+            grp <- paste("group", seq_len(ncol(propmat)))
+        ylab <- paste("Prop. of", grp)
+
+        for (i in seq_len(ncol(propmat)))
+        {
+            barplot(unname(propmat[, i]), space=0, border=NA, ylab=ylab[i],
+                ylim=ylim, col=col)
+            lines(c(1, nrow(propmat)), c(0, 0))
+            lines(c(1, nrow(propmat)), c(1, 1))
+            if (!is.null(group))
+            {
+                abline(v=xl, col="blue")
+                if (showgrp)
+                    text(x, 0.5, labels=grp_name, srt=30)
+                if ((i == 1L) & shownum)
+                {
+                    axis(1, c(0, x, nrow(propmat)),
+                        c("", as.character(lengths(idx)), ""), cex.axis=0.75)
+                }
+            }
+        }
+    } else {
+        if (is.null(col)) col <- rainbow(ncol(propmat))
+        barplot(t(unname(propmat)), col=col,
+            xlab="Individual #", ylab="Ancestry", space=0, border=NA)
+        if (!is.null(group))
+        {
+            abline(v=xl, col="black")
+            if (showgrp)
+                text(x, 0.5, labels=grp_name, srt=30)
+            if (shownum)
+            {
+                axis(1, c(0, x, nrow(propmat)),
+                    c("", as.character(lengths(idx)), ""), cex.axis=0.75)
+            }
+        }
+    }
+
+    invisible()
+}
+
+
+
+snpgdsAdmixTable <- function(propmat, group, sort=FALSE)
+{
+    # check
+    stopifnot(is.numeric(propmat), is.matrix(propmat))
+    stopifnot(is.vector(group) | is.factor(group), nrow(propmat)==length(group))
+    stopifnot(is.logical(sort), length(sort)==1L)
+
+    ans <- vector("list", ncol(propmat))
+    names(ans) <- colnames(propmat)
+    for (i in seq_along(ans))
+    {
+        rv <- NULL
+        for (grp in levels(factor(group)))
+        {
+            x <- group == grp
+            x[is.na(x)] <- FALSE
+            if (any(x))
+            {
+                y <- propmat[x, i]
+                v <- data.frame(group=grp, num=sum(x),
+                    mean = mean(y, na.rm=TRUE),  sd  = sd(y, na.rm=TRUE),
+                    min  = min(y, na.rm=TRUE),   max = max(y, na.rm=TRUE),
+                    stringsAsFactors=FALSE)
+                rv <- rbind(rv, v)
+            }
+        }
+        if (sort)
+            rv <- rv[order(rv$mean, decreasing=TRUE), ]
+        ans[[i]] <- rv
+    }
+    ans
+}
+
+
+
 #######################################################################
 # plot PCA results
 #
 
-plot.snpgdsPCAClass <- function(x, eig=c(1L,2L), ...)
+plot.snpgdsPCAClass <- function(x, eig=c(1L, 2L), ...)
 {
     stopifnot(inherits(x, "snpgdsPCAClass"))
     stopifnot(is.numeric(eig), length(eig) >= 2L)
@@ -354,6 +518,26 @@ plot.snpgdsPCAClass <- function(x, eig=c(1L,2L), ...)
     } else {
         pairs(x$eigenvect[, eig],
             labels=sprintf("Eig %d\n(%.1f%%)", eig, x$varprop[eig]*100),
+            gap=0.2, ...)
+    }
+
+    invisible()
+}
+
+
+plot.snpgdsEigMixClass <- function(x, eig=c(1L, 2L), ...)
+{
+    stopifnot(inherits(x, "snpgdsEigMixClass"))
+    stopifnot(is.numeric(eig), length(eig) >= 2L)
+
+    if (length(eig) == 2L)
+    {
+        plot(x$eigenvect[,eig[1L]], x$eigenvect[,eig[2L]],
+            xlab=sprintf("Eigenvector %d", eig[1L]),
+            ylab=sprintf("Eigenvector %d", eig[2L]),
+            ...)
+    } else {
+        pairs(x$eigenvect[, eig], labels=sprintf("Eig %d", eig),
             gap=0.2, ...)
     }
 
