@@ -78,10 +78,49 @@ private:
 			C_UInt8 *p2 = Base + I.Column() * npack2;
 			ssize_t m = npack;
 
-			if (p1 != p2)
+			#if defined(COREARRAY_SIMD_AVX2)
 			{
-			// off-diagonal
-			#if defined(COREARRAY_SIMD_SSE2)
+				for (; m >= 32; m-=32)
+				{
+					__m256i g1_1 = _mm256_loadu_si256((__m256i*)p1);
+					__m256i g1_2 = _mm256_loadu_si256((__m256i*)(p1 + npack));
+					__m256i g2_1 = _mm256_loadu_si256((__m256i*)p2);
+					__m256i g2_2 = _mm256_loadu_si256((__m256i*)(p2 + npack));
+					p1 += 32; p2 += 32;
+
+					__m256i mask = (g1_1 | ~g1_2) & (g2_1 | ~g2_2);
+					__m256i het  = (g1_1 ^ g1_2) | (g2_1 ^ g2_2);
+					__m256i ibs2 = ~(het | (g1_1 ^ g2_1));
+					het &= mask;
+					ibs2 &= mask;
+
+					p->ibscnt += POPCNT_M256(het) + (POPCNT_M256(ibs2) << 1);
+					p->num    += POPCNT_M256(mask);
+				}
+			}
+			#endif
+
+			#if defined(VECT_HARDWARE_POPCNT)
+			{
+				for (; m > 0; m-=16)
+				{
+					__m128i g1_1 = _mm_load_si128((__m128i*)p1);
+					__m128i g1_2 = _mm_load_si128((__m128i*)(p1 + npack));
+					__m128i g2_1 = _mm_load_si128((__m128i*)p2);
+					__m128i g2_2 = _mm_load_si128((__m128i*)(p2 + npack));
+					p1 += 16; p2 += 16;
+
+					__m128i mask = (g1_1 | ~g1_2) & (g2_1 | ~g2_2);
+					__m128i het  = (g1_1 ^ g1_2) | (g2_1 ^ g2_2);
+					__m128i ibs2 = ~(het | (g1_1 ^ g2_1));
+					het &= mask;
+					ibs2 &= mask;
+
+					p->ibscnt += POPCNT_M128(het) + (POPCNT_M128(ibs2) << 1);
+					p->num    += POPCNT_M128(mask);
+				}
+			}
+			#elif defined(COREARRAY_SIMD_SSE2)
 			{
 				POPCNT_SSE2_HEAD
 				__m128i ibscnt4i, num4i;
@@ -132,19 +171,6 @@ private:
 					p->num    += POPCNT_U64(mask);
 				}
 			#endif
-
-			} else {
-				// diagonal
-				for (; m > 0; m-=8)
-				{
-					C_UInt64 g1 = *((C_UInt64*)p1);
-					C_UInt64 g2 = *((C_UInt64*)(p1 + npack));
-					p1 += 8;
-					C_UInt64 mask = (g1 | ~g2);
-					p->ibscnt += POPCNT_U64(~(g1 ^ g2) & mask);
-					p->num    += POPCNT_U64(mask);
-				}
-			}
 		}
 	}
 
@@ -212,52 +238,84 @@ extern "C"
 
 using namespace IBD_BETA;
 
+static void CPU_Flag()
+{
+	Rprintf("Using CPU capabilities:");
+	#ifdef COREARRAY_SIMD_SSE2
+		Rprintf(" Double-Precision SSE2");
+	#endif
+	#ifdef VECT_HARDWARE_POPCNT
+		Rprintf(" POPCNT");
+	#endif
+	#ifdef COREARRAY_SIMD_AVX2
+		Rprintf(" AVX2");
+	#endif
+	Rprintf("\n");
+}
+
 
 /// Compute the IBD coefficients by individual relatedness beta
-COREARRAY_DLL_EXPORT void CalcIndivBetaGRM(CdMatTri<double> &grm,
-	int NumThread, bool Verbose)
+COREARRAY_DLL_EXPORT SEXP CalcIndivBetaGRM(int NumThread, bool Verbose)
 {
-	const size_t n = grm.N();
+	if (Verbose) CPU_Flag();
+
+	const size_t n = MCWorkingGeno.Space().SampleNum();
 	CdMatTri<TS_Beta> IBS(n);
 	CIndivBeta Work(MCWorkingGeno.Space());
 	Work.Run(IBS, NumThread, Verbose);
 
-	double *p = grm.Get();
-	TS_Beta *b = IBS.Get();
+	// output variables
+	SEXP rv_ans = PROTECT(Rf_allocMatrix(REALSXP, n, n));
+	double *pBeta = REAL(rv_ans);
+	TS_Beta *p = IBS.Get();
 	double avg = 0;
+
 	// for-loop, average
 	for (size_t i=0; i < n; i++)
 	{
-		*p++ = double(b->ibscnt) / b->num;
-		b++;
-		for (size_t j=i+1; j < n; j++, b++)
+		pBeta[i*n + i] = (0.5 * p->ibscnt) / p->num;
+		p ++;
+		for (size_t j=i+1; j < n; j++, p++)
 		{
-			double s = (0.5 * b->ibscnt) / b->num;
-			*p++ = s;
+			double s = (0.5 * p->ibscnt) / p->num;
+			pBeta[i*n + j] = s;
 			avg += s;
 		}
 	}
 
 	avg /= C_Int64(n) * (n-1) / 2;
 	double bt = 2.0 / (1 - avg);
-	p = grm.Get();
+
 	// for-loop, final update
 	for (size_t i=0; i < n; i++)
 	{
-		for (size_t j=i; j < n; j++, p++)
-			*p = (*p - avg) * bt;
+		pBeta[i*n + i] = (pBeta[i*n + i] - avg) * bt;
+		for (size_t j=i+1; j < n; j++)
+		{
+			double s = (pBeta[i*n + j] - avg) * bt;
+			pBeta[i*n + j] = pBeta[j*n + i] = s;
+		}
 	}
+
+	UNPROTECT(1);
+	return rv_ans;
 }
 
 
 /// Compute the IBD coefficients by individual relatedness beta
-COREARRAY_DLL_EXPORT SEXP gnrIBD_Beta(SEXP NumThread, SEXP _Verbose)
+COREARRAY_DLL_EXPORT SEXP gnrIBD_Beta(SEXP Inbreeding, SEXP NumThread,
+	SEXP Verbose)
 {
-	bool verbose = SEXP_Verbose(_Verbose);
+	int inbreeding = Rf_asLogical(Inbreeding);
+	if (inbreeding == NA_LOGICAL)
+		error("'inbreeding' must be TRUE or FALSE.");
+	bool verbose = SEXP_Verbose(Verbose);
+
 	COREARRAY_TRY
 
 		// cache the genotype data
 		CachingSNPData("Individual Beta", verbose);
+		if (verbose) CPU_Flag();
 
 		// the number of samples
 		const size_t n = MCWorkingGeno.Space().SampleNum();
@@ -277,7 +335,10 @@ COREARRAY_DLL_EXPORT SEXP gnrIBD_Beta(SEXP NumThread, SEXP _Verbose)
 		// for-loop, average
 		for (size_t i=0; i < n; i++)
 		{
-			pBeta[i*n + i] = double(p->ibscnt) / p->num;
+			if (inbreeding)
+				pBeta[i*n + i] = double(p->ibscnt) / p->num - 1;
+			else
+				pBeta[i*n + i] = (0.5 * p->ibscnt) / p->num;
 			p ++;
 			for (size_t j=i+1; j < n; j++, p++)
 			{

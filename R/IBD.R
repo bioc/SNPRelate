@@ -567,11 +567,11 @@ snpgdsGRM <- function(gdsobj, sample.id=NULL, snp.id=NULL,
         }
         population <- population[match(ws$sample.id, sample.id)]
     }
-    if (any(is.na(population)))
+    if (anyNA(population))
         stop("'population' should not have missing values!")
-    if (nlevels(population) <= 1)
+    if (nlevels(population) <= 1L)
         stop("There should be at least two populations!")
-    if (any(table(population) < 1))
+    if (any(table(population) < 1L))
         stop("Each population should have at least one individual.")
 
     if (ws$verbose)
@@ -613,12 +613,11 @@ snpgdsFst <- function(gdsobj, population, method=c("W&C84", "W&H02"),
     else
         rv <- list()
     rv$Fst <- d[[1L]]
-    if (method == "W&C84")
+    rv$MeanFst <- mean(d[[2L]], na.rm=TRUE)
+    rv$FstSNP <- d[[2L]]
+    if (method == "W&H02")
     {
-        rv$MeanFst <- d[[2L]]
-        rv$FstSNP <- d[[3L]]
-    } else {
-        rv$Beta <- d[[2L]]
+        rv$Beta <- d[[3L]]
         colnames(rv$Beta) <- rownames(rv$Beta) <- levels(population)
     }
 
@@ -633,11 +632,13 @@ snpgdsFst <- function(gdsobj, population, method=c("W&C84", "W&H02"),
 
 snpgdsIndivBeta <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     autosome.only=TRUE, remove.monosnp=TRUE, maf=NaN, missing.rate=NaN,
-    method=c("weighted"), num.thread=1L, with.id=TRUE, verbose=TRUE)
+    method=c("weighted"), inbreeding=TRUE, num.thread=1L, with.id=TRUE,
+    verbose=TRUE)
 {
     # check and initialize ...
     method <- match.arg(method)
-    ws <- .InitFile2(cmd="Individual Inbreeding and Relatedness:",
+    ws <- .InitFile2(
+        cmd="Individual Inbreeding and Relatedness (beta estimator):",
         gdsobj=gdsobj, sample.id=sample.id, snp.id=snp.id,
         autosome.only=autosome.only, remove.monosnp=remove.monosnp,
         maf=maf, missing.rate=missing.rate, num.thread=num.thread,
@@ -645,7 +646,7 @@ snpgdsIndivBeta <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     stopifnot(is.logical(with.id))
 
     # call GRM C function
-    rv <- .Call(gnrIBD_Beta, ws$num.thread, verbose)
+    rv <- .Call(gnrIBD_Beta, inbreeding, ws$num.thread, verbose)
 
     # return
     if (with.id)

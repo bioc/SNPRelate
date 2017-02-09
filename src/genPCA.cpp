@@ -1230,7 +1230,7 @@ COREARRAY_DLL_LOCAL int CalcEigen(double *pMat, int n, int nEig,
 		}
 
 		// output eigenvalues
-		vt<double>::Sub(REAL(EigVal), 0.0, REAL(EigVal), n);
+		vec_f64_sub2(REAL(EigVal), n, 0);
 
 		// output eigenvectors
 		EigVect = PROTECT(Rf_allocMatrix(REALSXP, n, nEig));
@@ -1283,6 +1283,19 @@ COREARRAY_DLL_LOCAL int CalcEigen(double *pMat, int n, int nEig,
 }
 
 
+static void CPU_Flag()
+{
+	Rprintf("Using CPU capabilities:");
+	#ifdef COREARRAY_SIMD_SSE2
+		Rprintf(" Double-Precision SSE2");
+	#endif
+	#ifdef COREARRAY_SIMD_AVX
+		Rprintf(" AVX");
+	#endif
+	Rprintf("\n");
+}
+
+
 
 // ========================================================================
 // Principal Component Analysis (PCA)
@@ -1300,6 +1313,7 @@ COREARRAY_DLL_EXPORT SEXP gnrPCA(SEXP EigenCnt, SEXP Algorithm,
 
 		// cache the genotype data
 		CachingSNPData("PCA", verbose);
+		if (verbose) CPU_Flag();
 
 		// PCA algorithm: exact and fast randomized
 		if (strcmp(CHAR(STRING_ELT(Algorithm, 0)), "exact") == 0)
@@ -1353,7 +1367,7 @@ COREARRAY_DLL_EXPORT SEXP gnrPCA(SEXP EigenCnt, SEXP Algorithm,
 						TimeToStr());
 				}
 
-				vt<double>::Sub(Cov.Get(), 0.0, Cov.Get(), Cov.Size());
+				vec_f64_sub2(Cov.Get(), Cov.Size(), 0);
 
 				int nEig = Rf_asInteger(EigenCnt);
 				if (nEig < 0)
@@ -1506,10 +1520,8 @@ COREARRAY_DLL_EXPORT SEXP gnrGRM(SEXP _NumThread, SEXP _Method, SEXP _Verbose)
 
 	COREARRAY_TRY
 
-		// ======== To cache the genotype data ========
+		// cache the genotype data
 		CachingSNPData("GRM Calculation", verbose);
-
-		// ======== The calculation of genetic covariance matrix ========
 
 		// the number of samples
 		const R_xlen_t n = MCWorkingGeno.Space().SampleNum();
@@ -1517,43 +1529,44 @@ COREARRAY_DLL_EXPORT SEXP gnrGRM(SEXP _NumThread, SEXP _Method, SEXP _Verbose)
 		// set internal parameters
 		PCA::CProdMat_AlgArith::PCA_Detect_BlockNumSNP(n);
 
-		// the upper-triangle IBD matrix
-		CdMatTri<double> IBD(n);
-
 		if (strcmp(Method, "Eigenstrat") == 0)
 		{
+			if (verbose) CPU_Flag();
+			CdMatTri<double> IBD(n);
 			CExactPCA pca(MCWorkingGeno.Space());
 			pca.Run(IBD, nThread, false, verbose);
 			// normalize
 			double TraceXTX = IBD.Trace();
 			double scale = double(n-1) / TraceXTX;
-			vt<double, av16Align>::Mul(IBD.Get(), IBD.Get(), scale, IBD.Size());
-
+			vec_f64_mul(IBD.Get(), IBD.Size(), scale);
+			// output
+			rv_ans = PROTECT(Rf_allocMatrix(REALSXP, n, n));
+			IBD.SaveTo(REAL(rv_ans));
 		} else if (strcmp(Method, "GCTA") == 0)
 		{
-			CachingSNPData("GCTA GRM", verbose);
+			if (verbose) CPU_Flag();
+			CdMatTri<double> IBD(n);
 			CGCTA_AlgArith GCTA(MCWorkingGeno.Space());
 			GCTA.Run(IBD, nThread, verbose);
+			// output
+			rv_ans = PROTECT(Rf_allocMatrix(REALSXP, n, n));
+			IBD.SaveTo(REAL(rv_ans));
 		} else if (strcmp(Method, "EIGMIX") == 0)
 		{
 			extern void CalcEigMixGRM(CdMatTri<double> &grm, int NumThread,
 				bool Verbose);
-			// cache the genotype data
-			CachingSNPData("EIGMIX", verbose);
+			CdMatTri<double> IBD(n);
 			CalcEigMixGRM(IBD, nThread, verbose);
+			// output
+			rv_ans = PROTECT(Rf_allocMatrix(REALSXP, n, n));
+			IBD.SaveTo(REAL(rv_ans));
 		} else if (strcmp(Method, "IndivBeta") == 0)
 		{
-			extern SEXP CalcIndivBetaGRM(CdMatTri<double> &grm, int NumThread,
-				bool Verbose);
-			// cache the genotype data
-			CachingSNPData("Individual Beta", verbose);
-			CalcIndivBetaGRM(IBD, nThread, verbose);
+			extern SEXP CalcIndivBetaGRM(int NumThread, bool Verbose);
+			rv_ans = PROTECT(CalcIndivBetaGRM(nThread, verbose));
 		} else
 			throw ErrCoreArray("Invalid 'method'!");
 
-		// Output
-		PROTECT(rv_ans = Rf_allocMatrix(REALSXP, n, n));
-		IBD.SaveTo(REAL(rv_ans));
 		UNPROTECT(1);
 
 	COREARRAY_CATCH
