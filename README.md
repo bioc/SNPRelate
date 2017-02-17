@@ -24,7 +24,7 @@ Release Version: v1.8.0
 
 [http://www.bioconductor.org/packages/release/bioc/html/SNPRelate.html](http://www.bioconductor.org/packages/release/bioc/html/SNPRelate.html)
 
-Development Version: v1.9.4
+Development Version: v1.9.5
 
 [http://www.bioconductor.org/packages/devel/bioc/html/SNPRelate.html](http://www.bioconductor.org/packages/devel/bioc/html/SNPRelate.html)
 
@@ -99,10 +99,10 @@ install.packages("SNPRelate", repos="http://R-Forge.R-project.org")
 | snpgdsIBDMoM         | X |
 | snpgdsIBS            | X | X |
 | snpgdsIBSNum         | X | X |
-| snpgdsIndivBeta      | X | X |   | X |
+| snpgdsIndivBeta      | X | X | P | X |
 | snpgdsPCA            | X | X | X |
 | snpgdsPCACorr        | X |
 | snpgdsPCASampLoading | X |
 | snpgdsPCASNPLoading  | X |
 
-`X`: fully supported;  `.`: partially supported.
+`X`: fully supported;  `.`: partially supported; `P`: POPCNT instruction.
