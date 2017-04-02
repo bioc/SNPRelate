@@ -20,11 +20,11 @@ The GDS format offers the efficient operations specifically designed for integer
 
 ## Bioconductor:
 
-Release Version: v1.8.0
+Release Version: v1.10.0
 
 [http://www.bioconductor.org/packages/release/bioc/html/SNPRelate.html](http://www.bioconductor.org/packages/release/bioc/html/SNPRelate.html)
 
-Development Version: v1.9.5
+Development Version: v1.11.0
 
 [http://www.bioconductor.org/packages/devel/bioc/html/SNPRelate.html](http://www.bioconductor.org/packages/devel/bioc/html/SNPRelate.html)
 
@@ -44,6 +44,8 @@ Development Version: v1.9.5
 ## Citation
 
 Zheng X, Levine D, Shen J, Gogarten SM, Laurie C, Weir BS (2012). A High-performance Computing Toolset for Relatedness and Principal Component Analysis of SNP Data. *Bioinformatics*. [DOI: 10.1093/bioinformatics/bts606](http://dx.doi.org/10.1093/bioinformatics/bts606).
+
+Zheng X, Gogarten S, Lawrence M, Stilp A, Conomos M, Weir BS, Laurie C, Levine D (2017). SeqArray -- A storage-efficient high-performance data format for WGS variant calls. *Bioinformatics*. [DOI: 10.1093/bioinformatics/btx145](http://dx.doi.org/10.1093/bioinformatics/btx145).
 
 
 ## Installation
@@ -90,6 +92,8 @@ install.packages("SNPRelate", repos="http://R-Forge.R-project.org")
 
 ## Implementation with Intel Intrinsics
 
+### Implementation Table:
+
 | Function             | No SIMD | SSE2 | AVX | AVX2 | AVX-512 |
 |:---------------------|:-------:|:----:|:---:|:----:|:-------:|
 | snpgdsDiss           | X |
@@ -105,4 +109,17 @@ install.packages("SNPRelate", repos="http://R-Forge.R-project.org")
 | snpgdsPCASampLoading | X |
 | snpgdsPCASNPLoading  | X |
 
-`X`: fully supported;  `.`: partially supported; `P`: POPCNT instruction.
+`X: fully supported;  .: partially supported;  P: POPCNT instruction.`
+
+
+### Install the package from the source code with the support of Intel SIMD Intrinsics:
+
+You have to customize the package compilation, see: [CRAN: Customizing-package-compilation](http://cran.r-project.org/doc/manuals/r-release/R-admin.html#Customizing-package-compilation)
+
+Change `~/.R/Makevars` to, assuming GNU Compilers (gcc/g++) or Clang compiler (clang++) are installed:
+```sh
+## for C code
+CFLAGS=-g -O2 -march=native -mtune=native
+## for C++ code
+CXXFLAGS=-g -O2 -march=native -mtune=native
+```
