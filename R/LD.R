@@ -24,9 +24,9 @@ snpgdsLDpair <- function(snp1, snp2,
     method=c("composite", "r", "dprime", "corr"))
 {
     # check
-    stopifnot(is.numeric(snp1) & is.vector(snp1))
-    stopifnot(is.numeric(snp2) & is.vector(snp2))
-    stopifnot(length(snp1) == length(snp2))
+    stopifnot(is.numeric(snp1), is.vector(snp1))
+    stopifnot(is.numeric(snp2), is.vector(snp2))
+    stopifnot(length(snp1)==length(snp2))
 
     method <- match.arg(method)
     method <- match(method, c("composite", "r", "dprime", "corr"))
@@ -35,7 +35,7 @@ snpgdsLDpair <- function(snp1, snp2,
     rv <- .Call(gnrLDpair, as.integer(snp1), as.integer(snp2), method)
 
     # output
-    if (method %in% c(2, 3))
+    if (method %in% c(2L, 3L))
     {
         names(rv) <- c("ld", "pA_A", "pA_B", "pB_A", "pB_B")
     } else {
@@ -73,14 +73,16 @@ snpgdsLDMat <- function(gdsobj, sample.id=NULL, snp.id=NULL, slide=250L,
 
     if (verbose)
     {
-        cat("Linkage Disequilibrium (LD) analysis on genotypes:\n");
+        cat("Linkage Disequilibrium (LD) estimation on genotypes:\n");
         cat("Working space:", ws$n.samp, "samples,", ws$n.snp, "SNPs\n");
         if (num.thread <= 1L)
-            cat("\tUsing", num.thread, "(CPU) core.\n")
+            cat("    using", num.thread, "(CPU) core.\n")
         else
-            cat("\tUsing", num.thread, "(CPU) cores.\n")
+            cat("    using", num.thread, "(CPU) cores.\n")
         if (slide > 0L)
-            cat("\tSliding window size:", slide, "\n")
+            cat("    sliding window size:", slide, "\n")
+        cat("    method: ", c("composite", "R", "D'", "correlation",
+            "covariance")[method], "\n", sep="")
     }
 
     # call C function
@@ -103,7 +105,7 @@ snpgdsLDpruning <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     autosome.only=TRUE, remove.monosnp=TRUE, maf=NaN, missing.rate=NaN,
     method=c("composite", "r", "dprime", "corr"),
     slide.max.bp=500000, slide.max.n=NA, ld.threshold=0.2,
-    num.thread=1, verbose=TRUE)
+    num.thread=1L, verbose=TRUE)
 {
     # check
     ws <- .InitFile2(
@@ -120,8 +122,8 @@ snpgdsLDpruning <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     stopifnot(is.numeric(num.thread) & (num.thread>0))
     if (num.thread > 1)
     {
-        warning("The current version of 'snpgdsLDpruning' ",
-            "does not support multi processes.")
+        warning("The current version of 'snpgdsLDpruning()' ",
+            "does not support multi-threading.")
     }
     stopifnot(is.logical(verbose))
 
@@ -130,8 +132,9 @@ snpgdsLDpruning <- function(gdsobj, sample.id=NULL, snp.id=NULL,
         bp <- slide.max.bp; mn <- slide.max.n
         if (!is.finite(bp)) bp <- Inf
         if (!is.finite(mn)) mn <- Inf
-        cat(sprintf("\tSliding window: %g basepairs, %g SNPs\n", bp, mn))
-        cat(sprintf("\t|LD| threshold: %g\n", ld.threshold))
+        cat("    sliding window:", prettyNum(bp, ",", scientific=FALSE),
+            "basepairs,", prettyNum(mn, ",", scientific=FALSE), "SNPs\n")
+        cat(sprintf("    |LD| threshold: %g\n", ld.threshold))
     }
 
     if (!is.finite(slide.max.bp))
@@ -145,6 +148,11 @@ snpgdsLDpruning <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     {
         stop("method should be one of ",
             "\"composite\", \"r\", \"dprime\" and \"corr\"")
+    }
+    if (verbose)
+    {
+        cat("    method: ", c("composite", "R", "D'", "correlation")[method],
+            "\n", sep="")
     }
 
     if (!inherits(gdsobj, "SeqVarGDSClass"))
@@ -161,12 +169,13 @@ snpgdsLDpruning <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     }
 
     # for-loop each chromosome
-    ntotal <- 0; res <- list()
+    ntotal <- 0L
+    res <- list()
     snp.flag <- total.snp.ids %in% ws$snp.id
     samp.flag <- total.samp.ids %in% ws$sample.id
 
     if (is.numeric(chr))
-        chrset <- setdiff(unique(chr), c(0, NA))
+        chrset <- setdiff(unique(chr), c(0L, NA))
     else if (is.character(chr))
         chrset <- setdiff(unique(chr), c("", NA))
     else
@@ -189,9 +198,9 @@ snpgdsLDpruning <- function(gdsobj, sample.id=NULL, snp.id=NULL,
             }
 
             # call LD prune for this chromosome
-            startidx <- sample(1:n.tmp, 1)
+            startidx <- sample(1:n.tmp, 1L)
 
-            rv <- .Call(gnrLDpruning, as.integer(startidx-1), position[flag],
+            rv <- .Call(gnrLDpruning, as.integer(startidx-1L), position[flag],
                 as.integer(slide.max.bp), as.integer(slide.max.n),
                 as.double(ld.threshold), method)
 
@@ -205,14 +214,19 @@ snpgdsLDpruning <- function(gdsobj, sample.id=NULL, snp.id=NULL,
             if (verbose)
             {
                 ntmp <- sum(rv); ntot <- sum(chr == ch)
-                cat(sprintf("Chromosome %s: %0.2f%%, %d/%d\n",
-                    as.character(ch), 100*ntmp/ntot, ntmp, ntot))
+                cat(sprintf("Chromosome %s: %0.2f%%, %s/%s\n",
+                    as.character(ch), 100*ntmp/ntot,
+                    prettyNum(ntmp, ",", scientific=FALSE),
+                    prettyNum(ntot, ",", scientific=FALSE)))
             }
         }
     }
 
     if (verbose)
-        cat(sprintf("%d SNPs are selected in total.\n", ntotal))
+    {
+        cat(prettyNum(ntotal, ",", scientific=FALSE),
+            "markers are selected in total.\n")
+    }
 
     # return
     return(res)
@@ -235,13 +249,13 @@ snpgdsApartSelection <- function(chromosome, position, min.dist=100000,
         stop("The lengths of 'chomosome' and 'position' do not match.")
 
     stopifnot(is.numeric(min.dist) & is.vector(min.dist))
-    stopifnot(length(min.dist) == 1)
+    stopifnot(length(min.dist)==1L)
 
     stopifnot(is.numeric(max.n.snp.perchr) & is.vector(max.n.snp.perchr))
-    stopifnot(length(max.n.snp.perchr) == 1)
+    stopifnot(length(max.n.snp.perchr)==1L)
 
     stopifnot(is.logical(verbose) & is.vector(verbose))
-    stopifnot(length(verbose) == 1)
+    stopifnot(length(verbose)==1L)
 
     # chromosome codes
     chrlist <- unique(chromosome)
