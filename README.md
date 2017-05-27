@@ -20,11 +20,11 @@ The GDS format offers the efficient operations specifically designed for integer
 
 ## Bioconductor:
 
-Release Version: v1.10.0
+Release Version: v1.10.2
 
 [http://www.bioconductor.org/packages/release/bioc/html/SNPRelate.html](http://www.bioconductor.org/packages/release/bioc/html/SNPRelate.html)
 
-Development Version: v1.11.0
+Development Version: v1.11.1
 
 [http://www.bioconductor.org/packages/devel/bioc/html/SNPRelate.html](http://www.bioconductor.org/packages/devel/bioc/html/SNPRelate.html)
 
@@ -79,13 +79,6 @@ curl -L https://github.com/zhengxwen/gdsfmt/tarball/master/ -o gdsfmt_latest.tar
 curl -L https://github.com/zhengxwen/SNPRelate/tarball/master/ -o SNPRelate_latest.tar.gz
 R CMD INSTALL gdsfmt_latest.tar.gz
 R CMD INSTALL SNPRelate_latest.tar.gz
-```
-
-
-* Old version (<= v0.9.19) from [R-Forge](http://R-Forge.R-project.org) repository:
-```R
-install.packages("gdsfmt", repos="http://R-Forge.R-project.org")
-install.packages("SNPRelate", repos="http://R-Forge.R-project.org")
 ```
 
 

@@ -1,3 +1,12 @@
+CHANGES IN VERSION 1.10.2
+-------------------------
+
+    o progress information: showing overall running time when completed
+
+    o An unexpected exception in a thread could result in deadlock: the current
+      implementation shows error information and exits the R session
+
+
 CHANGES IN VERSION 1.10.0
 -------------------------
 
