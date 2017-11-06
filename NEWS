@@ -1,3 +1,9 @@
+CHANGES IN VERSION 1.12.1
+-------------------------
+
+    o fix an issue in the C code 'LENGTH or similar applied to NULL object'
+
+
 CHANGES IN VERSION 1.12.0
 -------------------------
 
