@@ -1551,14 +1551,34 @@ COREARRAY_DLL_EXPORT SEXP gnrPCASampLoading(SEXP EigenCnt, SEXP SNPLoadings,
 // Genetic relationship matrix
 // =======================================================================
 
+static void grm_save_to_gds(CdMatTri<double> &mat, PdGDSObj gdsn, bool verbose)
+{
+	if (verbose)
+		Rprintf("Saving to the GDS file:\n");
+	const size_t n = mat.N();
+	vector<double> buf(n);
+	CProgress prog(verbose ? n : -1);
+	for (size_t i=0; i < n; i++)
+	{
+		mat.GetRow(&buf[0], i);
+		GDS_Array_AppendData(gdsn, n, &buf[0], svFloat64);
+		prog.Forward(1);
+	}
+}
+
 /// Compute the eigenvalues and eigenvectors
-COREARRAY_DLL_EXPORT SEXP gnrGRM(SEXP _NumThread, SEXP _Method, SEXP _Verbose)
+COREARRAY_DLL_EXPORT SEXP gnrGRM(SEXP _NumThread, SEXP _Method, SEXP _GDS,
+	SEXP _Verbose)
 {
 	const int nThread  = Rf_asInteger(_NumThread);
 	const char *Method = CHAR(STRING_ELT(_Method, 0));
 	const bool verbose = SEXP_Verbose(_Verbose);
 
 	COREARRAY_TRY
+
+		PdGDSObj gdsn = NULL;
+		if (!Rf_isNull(_GDS))
+			gdsn = GDS_Node_Path(GDS_R_SEXP2FileRoot(_GDS), "grm", TRUE);
 
 		// cache the genotype data
 		CachingSNPData("GRM Calculation", verbose);
@@ -1580,10 +1600,28 @@ COREARRAY_DLL_EXPORT SEXP gnrGRM(SEXP _NumThread, SEXP _Method, SEXP _Verbose)
 			double scale = double(n-1) / TraceXTX;
 			vec_f64_mul(IBD.Get(), IBD.Size(), scale);
 			// output
-			rv_ans = PROTECT(Rf_allocMatrix(REALSXP, n, n));
-			IBD.SaveTo(REAL(rv_ans));
+			if (!gdsn)
+			{
+				rv_ans = PROTECT(Rf_allocMatrix(REALSXP, n, n));
+				IBD.SaveTo(REAL(rv_ans));
+			} else
+				grm_save_to_gds(IBD, gdsn, verbose);
 
-		} else if (strcmp(Method, "GCTA")==0 || strcmp(Method, "Corr")==0)
+		} else if (strcmp(Method, "GCTA") == 0)
+		{
+			if (verbose) CPU_Flag();
+			CdMatTri<double> IBD(n);
+			CGCTA_AlgArith GCTA(MCWorkingGeno.Space());
+			GCTA.Run(IBD, nThread, verbose);
+			// output
+			if (!gdsn)
+			{
+				rv_ans = PROTECT(Rf_allocMatrix(REALSXP, n, n));
+				IBD.SaveTo(REAL(rv_ans));
+			} else
+				grm_save_to_gds(IBD, gdsn, verbose);
+
+		} else if (strcmp(Method, "Corr") == 0)
 		{
 			if (verbose) CPU_Flag();
 			{
@@ -1618,9 +1656,14 @@ COREARRAY_DLL_EXPORT SEXP gnrGRM(SEXP _NumThread, SEXP _Method, SEXP _Verbose)
 				bool Verbose);
 			CdMatTri<double> IBD(n);
 			CalcEigMixGRM(IBD, nThread, verbose);
+
 			// output
-			rv_ans = PROTECT(Rf_allocMatrix(REALSXP, n, n));
-			IBD.SaveTo(REAL(rv_ans));
+			if (!gdsn)
+			{
+				rv_ans = PROTECT(Rf_allocMatrix(REALSXP, n, n));
+				IBD.SaveTo(REAL(rv_ans));
+			} else
+				grm_save_to_gds(IBD, gdsn, verbose);
 
 		} else if (strcmp(Method, "IndivBeta") == 0)
 		{
@@ -1634,6 +1677,57 @@ COREARRAY_DLL_EXPORT SEXP gnrGRM(SEXP _NumThread, SEXP _Method, SEXP _Verbose)
 			Rprintf("%s    Done.\n", TimeToStr());
 		UNPROTECT(1);
 
+	COREARRAY_CATCH
+}
+
+
+/// Combine GRM matrices
+COREARRAY_DLL_EXPORT SEXP gnrGRMMerge(SEXP OutGDS, SEXP GDSList, SEXP Weight,
+	SEXP Verbose)
+{
+	const double *weight = REAL(Weight);
+	const bool verbose = SEXP_Verbose(Verbose);
+	const int n = LENGTH(Weight);
+
+	COREARRAY_TRY
+		// input gds files
+		vector<PdGDSObj> list_gdsn(n);
+		for (int i=0; i < n; i++)
+		{
+			list_gdsn[i] = GDS_Node_Path(
+				GDS_R_SEXP2FileRoot(VECTOR_ELT(GDSList, i)), "grm", TRUE);
+		}
+		C_Int32 sz[2];
+		GDS_Array_GetDim(list_gdsn[0], sz, 2);
+		const int N = sz[0];
+		// output gds file
+		PdGDSObj out_gdsn;
+		if (Rf_isNull(OutGDS))
+		{
+			out_gdsn = NULL;
+			rv_ans = Rf_allocMatrix(REALSXP, N, N);
+		} else {
+			out_gdsn = GDS_Node_Path(GDS_R_SEXP2FileRoot(OutGDS), "grm", TRUE);
+		}
+		// initialize
+		vector<double> sum(N), buf(N);
+		CProgress prog(verbose ? N : -1);
+		C_Int32 cnt[2] = { 1, N };
+		// for-loop
+		for (int i=0; i < N; i++)
+		{
+			double *p = out_gdsn ? &sum[0] : (REAL(rv_ans) + i*N);
+			memset(p, 0, sizeof(double)*N);
+			const C_Int32 st[2] = { i, 0 };
+			for (int k=0; k < n; k++)
+			{
+				GDS_Array_ReadData(list_gdsn[k], st, cnt, &buf[0], svFloat64);
+				vec_f64_addmul(p, &buf[0], N, weight[k]);
+			}
+			if (out_gdsn)
+				GDS_Array_AppendData(out_gdsn, N, &sum[0], svFloat64);
+			prog.Forward(1);
+		}
 	COREARRAY_CATCH
 }
 
