@@ -553,8 +553,7 @@ snpgdsGRM <- function(gdsobj, sample.id=NULL, snp.id=NULL,
         put.attr.gdsn(out.gds$root, "FileFormat", "SNPRELATE_OUTPUT")
         put.attr.gdsn(out.gds$root, "version",
             paste0("SNPRelate_", packageVersion("SNPRelate")))
-        add.gdsn(out.gds, "command", c("snpgdsGRM", paste(":method =", method)),
-            compress=out.compress, closezip=TRUE)
+        add.gdsn(out.gds, "command", c("snpgdsGRM", paste(":method =", method)))
         add.gdsn(out.gds, "sample.id", ws$sample.id, compress=out.compress,
             closezip=TRUE)
         add.gdsn(out.gds, "snp.id", ws$snp.id, compress=out.compress,
@@ -571,7 +570,10 @@ snpgdsGRM <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     if (is.null(out.gds))
     {
         if (with.id)
-            rv <- list(sample.id=ws$sample.id, snp.id=ws$snp.id, method=method, grm=rv)
+        {
+            rv <- list(sample.id=ws$sample.id, snp.id=ws$snp.id, method=method,
+                grm=rv)
+        }
         rv
     } else
         invisible()
@@ -661,8 +663,9 @@ snpgdsMergeGRM <- function(filelist, out.fn=NULL, out.prec=c("double", "single")
         put.attr.gdsn(out.gds$root, "FileFormat", "SNPRELATE_OUTPUT")
         put.attr.gdsn(out.gds$root, "version",
             paste0("SNPRelate_", packageVersion("SNPRelate")))
-        add.gdsn(out.gds, "command", cmd, compress=out.compress, closezip=TRUE)
-        add.gdsn(out.gds, "sample.id", sampid, compress=out.compress, closezip=TRUE)
+        add.gdsn(out.gds, "command", cmd)
+        add.gdsn(out.gds, "sample.id", sampid, compress=out.compress,
+            closezip=TRUE)
     } else {
         out.gds <- NULL
     }

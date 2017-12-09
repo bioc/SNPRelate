@@ -15,7 +15,8 @@ snpgdsMergeGRM(filelist, out.fn=NULL, out.prec=c("double", "single"),
     \item{out.fn}{NULL, return a GRM object; or characters, the output GDS
         file name}
     \item{out.prec}{double or single precision for storage}
-    \item{out.compress}{the compression method used in the GDS file}
+    \item{out.compress}{the compression method for storing the GRM matrix in
+        the GDS file}
     \item{weight}{NULL, weights proportional to the numbers of SNPs;
         a numeric vector, or a logical vector (FALSE for excluding some GRMs
         with a negative weight, weights proportional to the numbers of SNPs)}

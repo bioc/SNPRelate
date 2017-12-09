@@ -38,7 +38,8 @@ snpgdsGRM(gdsobj, sample.id=NULL, snp.id=NULL,
         the number of cores automatically}
     \item{out.fn}{NULL for no GDS output, or a file name}
     \item{out.prec}{double or single precision for storage}
-    \item{out.compress}{the compression method used in the GDS file}
+    \item{out.compress}{the compression method for storing the GRM matrix in
+        the GDS file}
     \item{with.id}{if \code{TRUE}, the returned value with \code{sample.id}
         and \code{sample.id}}
     \item{verbose}{if \code{TRUE}, show information}
