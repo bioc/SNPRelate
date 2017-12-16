@@ -18,13 +18,14 @@ Genome-wide association studies are widely used to investigate the genetic basis
 
 The GDS format offers the efficient operations specifically designed for integers with two bits, since a SNP could occupy only two bits. The SNP GDS format in this package is also used by the [GWASTools](http://bioconductor.org/packages/GWASTools) package with the support of S4 classes and generic functions. The extended GDS format is implemented in the [SeqArray](https://github.com/zhengxwen/SeqArray) package to support the storage of single nucleotide variation (SNV), insertion/deletion polymorphism (indel) and structural variation calls.
 
-## Bioconductor:
 
-Release Version: v1.12.0
+## Bioconductor
+
+Release Version: v1.12.1
 
 [http://www.bioconductor.org/packages/release/bioc/html/SNPRelate.html](http://www.bioconductor.org/packages/release/bioc/html/SNPRelate.html)
 
-Development Version: v1.13.0
+Development Version: v1.13.3
 
 [http://www.bioconductor.org/packages/devel/bioc/html/SNPRelate.html](http://www.bioconductor.org/packages/devel/bioc/html/SNPRelate.html)
 
@@ -113,9 +114,9 @@ You have to customize the package compilation, see: [CRAN: Customizing-package-c
 Change `~/.R/Makevars` to, assuming GNU Compilers (gcc/g++) or Clang compiler (clang++) are installed:
 ```sh
 ## for C code
-CFLAGS=-g -O2 -march=native -mtune=native
+CFLAGS=-g -O3 -march=native -mtune=native
 ## for C++ code
-CXXFLAGS=-g -O2 -march=native -mtune=native
+CXXFLAGS=-g -O3 -march=native -mtune=native
 ```
 
 
