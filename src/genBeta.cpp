@@ -2,7 +2,7 @@
 //
 // genBeta.cpp: Individual Inbreeding and Relatedness (Beta) on GWAS
 //
-// Copyright (C) 2016-2017    Xiuwen Zheng
+// Copyright (C) 2016-2018    Xiuwen Zheng
 //
 // This file is part of SNPRelate.
 //
@@ -257,7 +257,54 @@ static void CPU_Flag()
 }
 
 
-/// Compute the IBD coefficients by individual relatedness beta
+extern double grm_avg_value;
+
+/// Compute individual beta - based GRM
+COREARRAY_DLL_EXPORT void CalcIndivBetaGRM_Mat(CdMatTri<double> &beta,
+	int NumThread, bool Verbose)
+{
+	if (Verbose) CPU_Flag();
+
+	const size_t n = MCWorkingGeno.Space().SampleNum();
+	CdMatTri<TS_Beta> IBS(n);
+	CIndivBeta Work(MCWorkingGeno.Space());
+	Work.Run(IBS, NumThread, Verbose);
+
+	// output variables
+	double *pBeta = beta.Get();
+	TS_Beta *p = IBS.Get();
+	double avg = 0;
+	double min = double(p->ibscnt) / p->num - 1, r;
+
+	// for-loop, average
+	for (size_t i=0; i < n; i++)
+	{
+		*pBeta++ = r = double(p->ibscnt) / p->num - 1; p++;
+		if (min > r) min = r;
+		for (size_t j=i+1; j < n; j++)
+		{
+			*pBeta++ = r = (0.5 * p->ibscnt) / p->num; p++;
+			avg += r;
+			if (min > r) min = r;
+		}
+	}
+	avg /= C_Int64(n) * (n-1) / 2;
+	grm_avg_value = avg;
+
+	// transformation
+	pBeta = beta.Get();
+	double scale = 2.0 / (1 - min);
+	for (size_t i=0; i < n; i++)
+	{
+		*pBeta = (*pBeta - min) * scale * 0.5 + 1;
+		pBeta ++;
+		for (size_t j=i+1; j < n; j++, pBeta++)
+			*pBeta = (*pBeta - min) * scale;
+	}
+}
+
+
+/// Compute individual beta - based GRM
 COREARRAY_DLL_EXPORT SEXP CalcIndivBetaGRM(int NumThread, bool Verbose)
 {
 	if (Verbose) CPU_Flag();
@@ -276,28 +323,33 @@ COREARRAY_DLL_EXPORT SEXP CalcIndivBetaGRM(int NumThread, bool Verbose)
 	// for-loop, average
 	for (size_t i=0; i < n; i++)
 	{
-		pBeta[i*n + i] = (0.5 * p->ibscnt) / p->num;
-		p ++;
-		for (size_t j=i+1; j < n; j++, p++)
+		pBeta[i*n + i] = double(p->ibscnt) / p->num - 1; p++;
+		for (size_t j=i+1; j < n; j++)
 		{
-			double s = (0.5 * p->ibscnt) / p->num;
+			double s = (0.5 * p->ibscnt) / p->num; p++;
 			pBeta[i*n + j] = s;
 			avg += s;
 		}
 	}
-
 	avg /= C_Int64(n) * (n-1) / 2;
-	double bt = 2.0 / (1 - avg);
+	grm_avg_value = avg;
 
-	// for-loop, final update
+	// find the minimum of pairwise beta
+	double min = pBeta[0];
 	for (size_t i=0; i < n; i++)
 	{
-		pBeta[i*n + i] = (pBeta[i*n + i] - avg) * bt;
+		double *p = pBeta + i*n;
+		for (size_t j=i; j < n; j++)
+			if (min > p[j]) min = p[j];
+	}
+
+	// transformation
+	double scale = 2.0 / (1 - min);
+	for (size_t i=0; i < n; i++)
+	{
+		pBeta[i*n + i] = (pBeta[i*n + i] - min) * scale * 0.5 + 1;
 		for (size_t j=i+1; j < n; j++)
-		{
-			double s = (pBeta[i*n + j] - avg) * bt;
-			pBeta[i*n + j] = pBeta[j*n + i] = s;
-		}
+			pBeta[i*n + j] = pBeta[j*n + i] = (pBeta[i*n + j] - min) * scale;
 	}
 
 	UNPROTECT(1);
@@ -352,17 +404,15 @@ COREARRAY_DLL_EXPORT SEXP gnrIBD_Beta(SEXP Inbreeding, SEXP NumThread,
 		}
 
 		avg /= C_Int64(n) * (n-1) / 2;
-		double bt = 1.0 / (1 - avg);
+		grm_avg_value = avg;
 
 		// for-loop, final update
+		double bt = 1.0 / (1 - avg);
 		for (size_t i=0; i < n; i++)
 		{
 			pBeta[i*n + i] = (pBeta[i*n + i] - avg) * bt;
 			for (size_t j=i+1; j < n; j++)
-			{
-				double s = (pBeta[i*n + j] - avg) * bt;
-				pBeta[i*n + j] = pBeta[j*n + i] = s;
-			}
+				pBeta[i*n + j] = pBeta[j*n + i] = (pBeta[i*n + j] - avg) * bt;
 		}
 
 		if (verbose)

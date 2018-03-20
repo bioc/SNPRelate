@@ -6,7 +6,7 @@
 #     A High-performance Computing Toolset for Relatedness and
 # Principal Component Analysis of SNP Data
 #
-# Copyright (C) 2011 - 2017        Xiuwen Zheng
+# Copyright (C) 2011 - 2018        Xiuwen Zheng
 # License: GPL-3
 # Email: zhengxwen@gmail.com
 #
@@ -571,14 +571,19 @@ snpgdsGRM <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     # return
     if (is.null(out.gds))
     {
-        if (with.id)
-        {
-            rv <- list(sample.id=ws$sample.id, snp.id=ws$snp.id, method=method,
-                grm=rv)
-        }
+		if (with.id)
+		{
+			rv <- list(sample.id=ws$sample.id, snp.id=ws$snp.id,
+				method=method, grm=rv)
+            if (method %in% c("IndivBeta"))
+                rv$avg_val <- .Call(gnrGRM_avg_val)
+		}
         rv
-    } else
+    } else {
+        if (method %in% c("IndivBeta"))
+            add.gdsn(out.gds, "avg_val", .Call(gnrGRM_avg_val))
         invisible()
+    }
 }
 
 
@@ -634,6 +639,8 @@ snpgdsMergeGRM <- function(filelist, out.fn=NULL, out.prec=c("double", "single")
     if (length(dm)!=2L || dm[1L]!=dm[2L])
         stop("'", filelist[i], "' has an invalid GRM matrix.")
     cmd <- read.gdsn(index.gdsn(gdslist[[1L]], "command"))
+    if (cmd[1L] != "snpgdsGRM")
+        stop("The GDS files should be created by snpgdsGRM()")
     for (i in seq_along(filelist))
     {
         f <- gdslist[[i]]
@@ -652,7 +659,8 @@ snpgdsMergeGRM <- function(filelist, out.fn=NULL, out.prec=c("double", "single")
             num[!weight] <- -num[!weight]
         weight <- num / sum(num)
     }
-    if (verbose) cat("Weight: ", paste(weight, collapse=", "), "\n", sep="")
+    if (verbose)
+        cat("Weight: ", paste(sprintf("%g", weight), collapse=", "), "\n", sep="")
 
     if (!is.null(out.fn))
     {
@@ -696,12 +704,19 @@ snpgdsMergeGRM <- function(filelist, out.fn=NULL, out.prec=c("double", "single")
     }
 
     # call C
-    rv <- .Call(gnrGRMMerge, out.gds, gdslist, weight, verbose)
+    rv <- .Call(gnrGRMMerge, out.gds, gdslist, cmd[-1L], weight, verbose)
 
     if (is.null(out.gds))
-        list(sample.id=sampid, snp.id=sid, grm=rv)
-    else
+    {
+        rv <- list(sample.id=sampid, snp.id=sid, grm=rv)
+        if (cmd[2L] %in% c(":method = IndivBeta"))
+            rv$avg_val <- .Call(gnrGRM_avg_val)
+        rv
+    } else {
+        if (cmd[2L] %in% c(":method = IndivBeta"))
+            add.gdsn(out.gds, "avg_val", .Call(gnrGRM_avg_val))
         invisible()
+    }
 }
 
 
@@ -813,6 +828,33 @@ snpgdsIndivBeta <- function(gdsobj, sample.id=NULL, snp.id=NULL,
 
     # return
     if (with.id)
-        rv <- list(sample.id=ws$sample.id, snp.id=ws$snp.id, beta=rv)
+    {
+        rv <- list(sample.id=ws$sample.id, snp.id=ws$snp.id,
+            inbreeding=inbreeding, beta=rv, avg_val=.Call(gnrGRM_avg_val))
+    }
+    return(rv)
+}
+
+
+snpgdsIndivBetaRel <- function(beta, beta_rel, verbose=TRUE)
+{
+    # check
+    stopifnot(is.numeric(beta_rel), length(beta_rel)==1L)
+    stopifnot(is.logical(verbose), length(verbose)==1L)
+    if (class(beta) == "list")
+    {
+        if (!all(c("sample.id", "snp.id", "beta", "inbreeding") %in% names(beta)))
+            stop("'beta' should be the object returned from snpgdsIndivBeta() or snpgdsGRM()")
+        mat <- beta$beta
+        if (!beta$inbreeding)
+            diag(mat) <- (diag(mat) - 0.5) * 2
+    }
+
+    mat <- (mat - beta_rel) / (1 - beta_rel)
+    diag(mat) <- 0.5*diag(mat) + 0.5
+
+    # return
+    rv <- list(sample.id=beta$sample.id, snp.id=beta$snp.id, inbreeding=FALSE)
+    rv$beta <- mat
     return(rv)
 }
