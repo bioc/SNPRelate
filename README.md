@@ -16,7 +16,7 @@ SNPRelate: Parallel computing toolset for relatedness and principal component an
 
 Genome-wide association studies are widely used to investigate the genetic basis of diseases and traits, but they pose many computational challenges. We developed SNPRelate (R package for multi-core symmetric multiprocessing computer architectures) to accelerate two key computations on SNP data: principal component analysis (PCA) and relatedness analysis using identity-by-descent measures. The kernels of our algorithms are written in C/C++ and highly optimized.
 
-The GDS format offers the efficient operations specifically designed for integers with two bits, since a SNP could occupy only two bits. The SNP GDS format in this package is also used by the [GWASTools](http://bioconductor.org/packages/GWASTools) package with the support of S4 classes and generic functions. The extended GDS format is implemented in the [SeqArray](https://github.com/zhengxwen/SeqArray) package to support the storage of single nucleotide variation (SNV), insertion/deletion polymorphism (indel) and structural variation calls. It is strongly suggested to use SeqArray for large-scale whole-genome sequencing variant data instead of SNPRelate.
+The GDS format offers the efficient operations specifically designed for integers with two bits, since a SNP could occupy only two bits. The SNP GDS format in this package is also used by the [GWASTools](http://bioconductor.org/packages/GWASTools) package with the support of S4 classes and generic functions. The extended GDS format is implemented in the [SeqArray](https://github.com/zhengxwen/SeqArray) package to support the storage of single nucleotide variation (SNV), insertion/deletion polymorphism (indel) and structural variation calls. It is strongly suggested to use [SeqArray](https://github.com/zhengxwen/SeqArray) for large-scale whole-exome and whole-genome sequencing variant data instead of [SNPRelate](https://github.com/zhengxwen/SNPRelate).
 
 
 ## Bioconductor
@@ -25,7 +25,7 @@ Release Version: v1.12.2
 
 [http://www.bioconductor.org/packages/release/bioc/html/SNPRelate.html](http://www.bioconductor.org/packages/release/bioc/html/SNPRelate.html)
 
-Development Version: v1.13.8
+Development Version: v1.13.10
 
 [http://www.bioconductor.org/packages/devel/bioc/html/SNPRelate.html](http://www.bioconductor.org/packages/devel/bioc/html/SNPRelate.html)
 
@@ -92,7 +92,7 @@ R CMD INSTALL SNPRelate_latest.tar.gz
 |:---------------------|:-------:|:----:|:---:|:----:|:-------:|
 | snpgdsDiss [»](http://zhengxwen.github.io/SNPRelate/release/help/snpgdsDiss.html)           | X |
 | snpgdsEIGMIX [»](http://zhengxwen.github.io/SNPRelate/release/help/snpgdsEIGMIX.html)        | X | X | X |
-| snpgdsGRM [»](http://zhengxwen.github.io/SNPRelate/release/help/snpgdsGRM.html)           | X | X | X |
+| snpgdsGRM [»](http://zhengxwen.github.io/SNPRelate/release/help/snpgdsGRM.html)           | X | X | X | . |
 | snpgdsIBDKING [»](http://zhengxwen.github.io/SNPRelate/release/help/snpgdsIBDKING.html)       | X | X |   | X |
 | snpgdsIBDMoM [»](http://zhengxwen.github.io/SNPRelate/release/help/snpgdsIBDMoM.html)        | X |
 | snpgdsIBS [»](http://zhengxwen.github.io/SNPRelate/release/help/snpgdsIBS.html)           | X | X |
