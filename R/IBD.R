@@ -56,7 +56,7 @@ snpgdsIBDMoM <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     # return
     ans <- list(sample.id=ws$sample.id, snp.id=ws$snp.id, afreq=rv$afreq)
     ans$afreq[ans$afreq < 0] <- NaN
-    if (useMatrix)
+    if (isTRUE(useMatrix))
     {
         ans$k0 <- .newmat(ws$n.samp, rv$k0)
         ans$k1 <- .newmat(ws$n.samp, rv$k1)
@@ -333,7 +333,7 @@ snpgdsPairIBDMLELogLik <- function(geno1, geno2, allele.freq, k0=NaN, k1=NaN,
 snpgdsIBDKING <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     autosome.only=TRUE, remove.monosnp=TRUE, maf=NaN, missing.rate=NaN,
     type=c("KING-robust", "KING-homo"), family.id=NULL,
-    num.thread=1, verbose=TRUE)
+    num.thread=1L, useMatrix=FALSE, verbose=TRUE)
 {
     # check
     ws <- .InitFile2(
@@ -342,6 +342,7 @@ snpgdsIBDKING <- function(gdsobj, sample.id=NULL, snp.id=NULL,
         autosome.only=autosome.only, remove.monosnp=remove.monosnp,
         maf=maf, missing.rate=missing.rate, num.thread=num.thread,
         verbose=verbose)
+    stopifnot(is.logical(useMatrix), length(useMatrix)==1L)
 
     type <- match.arg(type)
 
@@ -383,11 +384,17 @@ snpgdsIBDKING <- function(gdsobj, sample.id=NULL, snp.id=NULL,
             cat("Relationship inference in a homogeneous population.\n")
 
         # call the C function
-        rv <- .Call(gnrIBD_KING_Homo, ws$num.thread, verbose)
-
-        rv <- list(sample.id=ws$sample.id, snp.id=ws$snp.id, afreq=NULL,
-            k0=rv[[1]], k1=rv[[2]])
-
+        v <- .Call(gnrIBD_KING_Homo, ws$num.thread, useMatrix, verbose)
+        # output
+        rv <- list(sample.id=ws$sample.id, snp.id=ws$snp.id, afreq=NULL)
+        if (isTRUE(useMatrix))
+        {
+            rv$k0 <- .newmat(ws$n.samp, v[[1L]])
+            rv$k1 <- .newmat(ws$n.samp, v[[2L]])
+        } else {
+            rv$k0 <- v[[1L]]
+            rv$k1 <- v[[2L]]
+        }
     } else if (type == "KING-robust")
     {
         if (verbose)
@@ -395,18 +402,25 @@ snpgdsIBDKING <- function(gdsobj, sample.id=NULL, snp.id=NULL,
             cat("Relationship inference in the presence of",
                 "population stratification.\n")
         }
-
         # call the C function
-        rv <- .Call(gnrIBD_KING_Robust, as.integer(family.id),
-            ws$num.thread, verbose)
-
-        rv <- list(sample.id=ws$sample.id, snp.id=ws$snp.id, afreq=NULL,
-            IBS0=rv[[1]], kinship=rv[[2]])
+        v <- .Call(gnrIBD_KING_Robust, as.integer(family.id),
+            ws$num.thread, useMatrix, verbose)
+        # output
+        rv <- list(sample.id=ws$sample.id, snp.id=ws$snp.id, afreq=NULL)
+        if (isTRUE(useMatrix))
+        {
+            rv$IBS0 <- .newmat(ws$n.samp, v[[1L]])
+            rv$kinship <- .newmat(ws$n.samp, v[[2L]])
+        } else {
+            rv$IBS0 <- v[[1L]]
+            rv$kinship <- v[[2L]]
+        }
     } else
         stop("Invalid 'type'.")
 
     # return
-    rv$afreq[rv$afreq < 0] <- NaN
+    if (!is.null(rv$afreq))
+        rv$afreq[rv$afreq < 0] <- NaN
     class(rv) <- "snpgdsIBDClass"
     return(rv)
 }
@@ -496,14 +510,17 @@ snpgdsIBDSelection <- function(ibdobj, kinship.cutoff=NaN, samp.sel=NULL)
     {
         flag <- lower.tri(ibdobj$kinship) & (ibdobj$kinship >= kinship.cutoff)
         flag[is.na(flag)] <- FALSE
-    } else
+    } else {
         flag <- lower.tri(ibdobj$kinship)
+    }
+
+    xx <- flag
+    if (inherits(flag, "Matrix")) xx <- as.matrix(xx)
 
     # output
-    n <- length(ibdobj$sample.id)
+    ii <- which(xx, TRUE)
     ans <- data.frame(
-        ID1 = .Call(gnrIBDSelSampID_List1, ibdobj$sample.id, flag),
-        ID2 = .Call(gnrIBDSelSampID_List2, ibdobj$sample.id, flag),
+        ID1 = ibdobj$sample.id[ii[,2L]], ID2 = ibdobj$sample.id[ii[,1L]],
         stringsAsFactors=FALSE)
     for (i in ns)
         ans[[i]] <- ibdobj[[i]][flag]
