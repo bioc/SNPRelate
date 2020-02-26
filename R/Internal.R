@@ -6,7 +6,7 @@
 #     A High-performance Computing Toolset for Relatedness and
 # Principal Component Analysis of SNP Data
 #
-# Copyright (C) 2011 - 2017        Xiuwen Zheng
+# Copyright (C) 2011 - 2020        Xiuwen Zheng
 # License: GPL-3
 # Email: zhengxwen@gmail.com
 #
@@ -50,6 +50,9 @@
         stop("The 'Matrix' package should be installed.")
     new("dspMatrix", uplo="L", Dim=c(n, n), x=x)
 }
+
+.cat <- function(...) cat(..., "\n", sep="")
+
 
 
 #######################################################################
@@ -225,8 +228,8 @@
                 m <- .seldim(gdsobj)[2L]
                 if (verbose & m<n)
                 {
-                    cat("Excluding ", .pretty(n-m), " SNV", .plural(n-m),
-                        " on non-autosomes\n", sep="")
+                    .cat("Excluding ", .pretty(n-m), " SNV", .plural(n-m),
+                        " on non-autosomes")
                 }
                 n <- m
             }
@@ -245,9 +248,9 @@
                 m <- .seldim(gdsobj)[2L]
                 if (verbose & m<n)
                 {
-                    cat("Excluding ", .pretty(n-m), " SNV", .plural(n-m),
+                    .cat("Excluding ", .pretty(n-m), " SNV", .plural(n-m),
                         " (monomorphic: ", remove.monosnp, ", MAF: ", maf,
-                        ", missing rate: ", missing.rate, ")\n", sep="")
+                        ", missing rate: ", missing.rate, ")")
                 }
                 n <- m
             }
@@ -256,23 +259,16 @@
             dm <- .seldim(gdsobj)
             if (verbose & verbose.work)
             {
-                cat("Working space: ",
-                    .pretty(dm[1L]), " sample", .plural(dm[1L]), ", ",
-                    .pretty(dm[2L]), " SNV", .plural(dm[2L]), "\n", sep="")
+                .cat("    # of samples: ", .pretty(dm[1L]))
+                .cat("    # of SNVs: ", .pretty(dm[2L]))
                 if (verbose.numthread)
-                {
-                    cat("    using ", num.thread, " (CPU) core",
-                        .plural(num.thread), "\n", sep="")
-                }
+                    .cat("    using ", num.thread, " thread", .plural(num.thread))
             }
 
 			if (!is.null(allele.freq))
 			{
 				if (length(allele.freq) != dm[3L])
-				{
-					stop("the length of allele.freq doest not ",
-						"match with the selected variants.")
-				}
+					stop("the length of allele.freq doest not match with the selected variants.")
 			}
 
             sel <- SeqArray::seqGetFilter(gdsobj)
@@ -358,12 +354,12 @@
                 if (identical(autosome.only, TRUE))
                 {
                     m <- dt$dim - sum(snp.id)
-                    cat("Excluding ", .pretty(m), " ", SSS, .plural(m),
-                        " (non-autosomes or non-selection)\n", sep="")
+                    .cat("Excluding ", .pretty(m), " ", SSS, .plural(m),
+                        " (non-autosomes or non-selection)")
                 } else {
                     m <- sum(snp.id)
-                    cat("Keeping ", .pretty(m), " ", SSS, .plural(m),
-                        " according to chromosome ", autosome.only, "\n", sep="")
+                    .cat("Keeping ", .pretty(m), " ", SSS, .plural(m),
+                        " according to chromosome ", autosome.only)
                 }
             }
         } else {
@@ -408,12 +404,12 @@
                 if (identical(autosome.only, TRUE))
                 {
                     m <- dt$dim - sum(snp.id)
-                    cat("Excluding ", .pretty(m), " ", SSS, .plural(m),
-                        " on non-autosomes\n", sep="")
+                    .cat("Excluding ", .pretty(m), " ", SSS, .plural(m),
+                        " on non-autosomes")
                 } else {
                     m <- sum(snp.id)
-                    cat("Keeping ", .pretty(m), " ", SSS, .plural(m),
-                        " according to chromosome ", autosome.only, "\n", sep="")
+                    .cat("Keeping ", .pretty(m), " ", SSS, .plural(m),
+                        " according to chromosome ", autosome.only)
                 }
             }
             snp.ids <- snp.ids[snp.id]
@@ -455,9 +451,9 @@
         # show
         if (verbose)
         {
-            cat("Excluding ", .pretty(rv[[1L]]), " ", SSS, .plural(rv[[1L]]),
+            .cat("Excluding ", .pretty(rv[[1L]]), " ", SSS, .plural(rv[[1L]]),
                 " (monomorphic: ", remove.monosnp, ", MAF: ", t.maf,
-                ", missing rate: ", t.miss, ")\n", sep="")
+                ", missing rate: ", t.miss, ")")
         }
     }
 
@@ -467,13 +463,10 @@
 
     if (verbose & verbose.work)
     {
-        cat("Working space: ", .pretty(dm[2L]), " sample", .plural(dm[2L]),
-            ", ", .pretty(dm[1L]), " ", SSS, .plural(dm[1L]), "\n", sep="")
+        .cat("    # of samples: ", .pretty(dm[2L]))
+        .cat("    # of ", SSS, .plural(dm[1L]), ": ", .pretty(dm[1L]))
         if (verbose.numthread)
-        {
-            cat("    using ", num.thread, " (CPU) core", .plural(num.thread),
-                "\n", sep="")
-        }
+            .cat("    using ", num.thread, " thread", .plural(num.thread))
     }
 
     # output

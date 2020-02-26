@@ -6,7 +6,7 @@
 #     A High-performance Computing Toolset for Relatedness and
 # Principal Component Analysis of SNP Data
 #
-# Copyright (C) 2011 - 2019        Xiuwen Zheng
+# Copyright (C) 2011 - 2020        Xiuwen Zheng
 # License: GPL-3
 # Email: zhengxwen@gmail.com
 #
@@ -45,13 +45,22 @@ snpgdsPCA <- function(gdsobj, sample.id=NULL, snp.id=NULL,
 
     if (genmat.only) need.genmat <- TRUE
     if (eigen.cnt <= 0L) eigen.cnt <- ws$n.samp
+    if (verbose)
+        .cat("    # of principal components: ", eigen.cnt)
 
     # call parallel PCA
     param <- list(bayesian=bayesian, need.genmat=need.genmat,
         genmat.only=genmat.only, eigen.method=eigen.method,
         aux.dim=aux.dim, iter.num=iter.num)
     if (algorithm == "randomized")
+    {
         param$aux.mat <- rnorm(aux.dim * ws$n.samp)
+        if (verbose)
+        {
+            .cat("    starting from a random matrix [", aux.dim, " x ",
+                ws$n.samp, "]")
+        }
+    }
     rv <- .Call(gnrPCA, eigen.cnt, algorithm, ws$num.thread, param, verbose)
 
     # return
@@ -75,6 +84,7 @@ snpgdsPCA <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     return(rv)
 }
 
+print.snpgdsPCAClass <- function(x, ...) str(x)
 
 
 #######################################################################
@@ -127,10 +137,9 @@ snpgdsPCACorr <- function(pcaobj, gdsobj, snp.id=NULL, eig.which=NULL,
     if (verbose)
     {
         cat("SNP Correlation:\n")
-        cat("Working space:", ws$n.samp, "samples,", ws$n.snp, "SNPs\n");
-        cat("    using ", num.thread, " (CPU) core", .plural(num.thread), "\n",
-            sep="")
-        cat("    using the top", length(eig.which), "eigenvectors\n")
+        .cat("    # of samples: ", .pretty(ws$n.samp))
+        .cat("    # of SNPs: ", .pretty(ws$n.snp))
+        .cat("    using ", num.thread, " thread", .plural(num.thread))
     }
 
     gds <- NULL
@@ -179,10 +188,10 @@ snpgdsPCASNPLoading <- function(pcaobj, gdsobj, num.thread=1L, verbose=TRUE)
 
     if (verbose)
     {
-        cat("SNP loading:\n")
-        cat("Working space:", ws$n.samp, "samples,", ws$n.snp, "SNPs\n");
-        cat("    using ", num.thread, " (CPU) core", .plural(num.thread), "\n",
-            sep="")
+        cat("SNP Loading:\n")
+        .cat("    # of samples: ", .pretty(ws$n.samp))
+        .cat("    # of SNPs: ", .pretty(ws$n.snp))
+        .cat("    using ", num.thread, " thread", .plural(num.thread))
         cat("    using the top", dim(pcaobj$eigenvect)[2L], "eigenvectors\n")
     }
 
@@ -215,6 +224,9 @@ snpgdsPCASNPLoading <- function(pcaobj, gdsobj, num.thread=1L, verbose=TRUE)
     return(rv)
 }
 
+print.snpgdsPCASNPLoadingClass <- function(x, ...) str(x)
+
+print.snpgdsEigMixSNPLoadingClass <- function(x, ...) str(x)
 
 
 #######################################################################
@@ -238,10 +250,10 @@ snpgdsPCASampLoading <- function(loadobj, gdsobj, sample.id=NULL,
     eigcnt <- nrow(loadobj$snploading)
     if (verbose)
     {
-        cat("Sample loading:\n")
-        cat("Working space:", ws$n.samp, "samples,", ws$n.snp, "SNPs\n")
-        cat("    using ", num.thread, " (CPU) core", .plural(num.thread), "\n",
-            sep="")
+        cat("Sample Loading:\n")
+        .cat("    # of samples: ", .pretty(ws$n.samp))
+        .cat("    # of SNPs: ", .pretty(ws$n.snp))
+        .cat("    using ", num.thread, " thread", .plural(num.thread))
         cat("    using the top", eigcnt, "eigenvectors\n")
     }
 
@@ -316,6 +328,7 @@ snpgdsEIGMIX <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     return(rv)
 }
 
+print.snpgdsEigMixClass <- function(x, ...) str(x)
 
 
 #######################################################################
