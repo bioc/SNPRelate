@@ -1,9 +1,17 @@
-CHANGES IN VERSION 1.37.2
+CHANGES IN VERSION 1.37.4
 -------------------------
 
 UTILITIES
 
     o faster `snpgdsLDpruning()` and new multi-threading implementation
+
+    o new option 'autosave' in `snpgdsLDpruning()`
+
+    o new option `start.pos="random.f500"` in `snpgdsLDpruning()`, allowing
+      faster genotype scanning (it is used by default now). To be compatible
+      with the previous versions, please specify `start.pos="random"` manually
+
+    o Fix the welcome message when running in a non x86 system
 
 
 CHANGES IN VERSION 1.36.1

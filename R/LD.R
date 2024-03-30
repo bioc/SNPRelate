@@ -100,8 +100,9 @@ snpgdsLDMat <- function(gdsobj, sample.id=NULL, snp.id=NULL, slide=250L,
 snpgdsLDpruning <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     autosome.only=TRUE, remove.monosnp=TRUE, maf=0.005, missing.rate=0.05,
     method=c("composite", "r", "dprime", "corr"), slide.max.bp=500000L,
-    slide.max.n=NA, ld.threshold=0.2, start.pos=c("random", "first", "last"),
-    num.thread=1L, verbose=TRUE)
+    slide.max.n=NA, ld.threshold=0.2,
+    start.pos=c("random.f500", "random", "first", "last"),
+    num.thread=1L, autosave=NULL, verbose=TRUE)
 {
     # check
     ws <- .InitFile2(
@@ -117,9 +118,14 @@ snpgdsLDpruning <- function(gdsobj, sample.id=NULL, snp.id=NULL,
     stopifnot(is.numeric(ld.threshold), is.finite(ld.threshold),
         length(ld.threshold)==1L)
     stopifnot(is.numeric(num.thread), num.thread > 0L)
-    stopifnot(is.logical(verbose), length(verbose)==1L)
-
+    stopifnot(is.null(autosave) | is.character(autosave))
+    if (is.character(autosave))
+    {
+        if (length(autosave)!=1L || anyNA(autosave) || autosave=="")
+            stop("'autosave' should be NULL or a file name.")
+    }
     start.pos <- match.arg(start.pos)
+    stopifnot(is.logical(verbose), length(verbose)==1L)
 
     if (verbose)
     {
@@ -187,9 +193,11 @@ snpgdsLDpruning <- function(gdsobj, sample.id=NULL, snp.id=NULL,
             } else {
                 .Call(gnrSetSeqSpace, gdsobj, samp.flag, flag)
             }
+            if (verbose) cat(sprintf("Chrom %s: ", ch))
 
             # call LD prune for this chromosome
             startidx <- switch(start.pos,
+                random.f500 = sample.int(min(n.tmp, 500L), 1L),
                 random = sample.int(n.tmp, 1L),
                 first  = 1L,
                 last   = n.tmp)
@@ -207,10 +215,18 @@ snpgdsLDpruning <- function(gdsobj, sample.id=NULL, snp.id=NULL,
             if (verbose)
             {
                 ntmp <- sum(rv); ntot <- sum(chr == ch)
-                cat(sprintf("Chromosome %s: %0.2f%%, %s/%s\n",
-                    as.character(ch), 100*ntmp/ntot,
+                cat(sprintf("    %0.2f%%, %s / %s (%s)\n", 100*ntmp/ntot,
                     prettyNum(ntmp, ",", scientific=FALSE),
-                    prettyNum(ntot, ",", scientific=FALSE)))
+                    prettyNum(ntot, ",", scientific=FALSE),
+                    date()))
+            }
+
+            # autosave
+            if (is.character(autosave))
+            {
+                if (verbose)
+                    cat("Save to ", sQuote(autosave), "\n", sep="")
+                saveRDS(res, file=autosave)
             }
         }
     }
@@ -221,8 +237,9 @@ snpgdsLDpruning <- function(gdsobj, sample.id=NULL, snp.id=NULL,
             "markers are selected in total.\n")
     }
 
-    # return
-    return(res)
+    # output
+    if (is.character(autosave)) return(invisible(res))
+    res
 }
 
 

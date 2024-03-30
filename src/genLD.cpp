@@ -23,16 +23,16 @@
 #ifndef _HEADER_LD_
 #define _HEADER_LD_
 
-// CoreArray library header
-#include <dGenGWAS.h>
-#include <dVect.h>
-
 // Standard library header
 #include <cmath>
 #include <cfloat>
 #include <memory>
 #include <list>
 #include <algorithm>
+
+// CoreArray library header
+#include <dGenGWAS.h>
+#include <dVect.h>
 
 
 #ifdef COREARRAY_SIMD_SSE
@@ -746,7 +746,7 @@ namespace LD
 		}
 	}
 
-	class CThreadPoolLD
+	class COREARRAY_DLL_DEFAULT CThreadPoolLD
 	{
 	public:
 		const C_UInt8 *BaseGeno;
