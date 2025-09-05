@@ -6,7 +6,7 @@
 #     A High-performance Computing Toolset for Relatedness and
 # Principal Component Analysis of SNP Data
 #
-# Copyright (C) 2011 - 2024        Xiuwen Zheng
+# Copyright (C) 2011 - 2025        Xiuwen Zheng
 # License: GPL-3
 #
 
@@ -20,7 +20,7 @@
 #
 
 snpgdsPCA <- function(gdsobj, sample.id=NULL, snp.id=NULL,
-    autosome.only=TRUE, remove.monosnp=TRUE, maf=NaN, missing.rate=NaN,
+    autosome.only=TRUE, remove.monosnp=TRUE, maf=NaN, missing.rate=0.01,
     algorithm=c("exact", "randomized"),
     eigen.cnt=ifelse(identical(algorithm, "randomized"), 16L, 32L),
     num.thread=1L, bayesian=FALSE, need.genmat=FALSE,
@@ -60,6 +60,13 @@ snpgdsPCA <- function(gdsobj, sample.id=NULL, snp.id=NULL,
                 ws$n.samp, "]")
         }
     }
+
+    # set the number of threads in BLAS
+    nt_old <- blas_get_num_procs()
+    if (is.na(nt_old)) nt_old <- 1L
+    blas_set_num_threads(ws$num.thread)
+    on.exit(blas_set_num_threads(nt_old))
+    # run the C code
     rv <- .Call(gnrPCA, eigen.cnt, algorithm, ws$num.thread, param, verbose)
 
     # return
@@ -190,7 +197,8 @@ snpgdsPCASNPLoading <- function(pcaobj, gdsobj, num.thread=1L, verbose=TRUE)
         cat("SNP Loading:\n")
         .cat("    # of samples: ", .pretty(ws$n.samp))
         .cat("    # of SNPs: ", .pretty(ws$n.snp))
-        .cat("    using ", num.thread, " thread", .plural(num.thread))
+        s <- .plural(num.thread)
+        .cat("    using ", num.thread, " thread", s, "/core", s)
         cat("    using the top", dim(pcaobj$eigenvect)[2L], "eigenvectors\n")
     }
 
@@ -252,7 +260,8 @@ snpgdsPCASampLoading <- function(loadobj, gdsobj, sample.id=NULL,
         cat("Sample Loading:\n")
         .cat("    # of samples: ", .pretty(ws$n.samp))
         .cat("    # of SNPs: ", .pretty(ws$n.snp))
-        .cat("    using ", num.thread, " thread", .plural(num.thread))
+        s <- .plural(num.thread)
+        .cat("    using ", num.thread, " thread", s, "/core", s)
         cat("    using the top", eigcnt, "eigenvectors\n")
     }
 
@@ -300,7 +309,7 @@ snpgdsPCASampLoading <- function(loadobj, gdsobj, sample.id=NULL,
 #
 
 snpgdsEIGMIX <- function(gdsobj, sample.id=NULL, snp.id=NULL,
-    autosome.only=TRUE, remove.monosnp=TRUE, maf=NaN, missing.rate=NaN,
+    autosome.only=TRUE, remove.monosnp=TRUE, maf=NaN, missing.rate=0.01,
     num.thread=1L, eigen.cnt=32L, diagadj=TRUE, ibdmat=FALSE, verbose=TRUE)
 {
     # check and initialize ...

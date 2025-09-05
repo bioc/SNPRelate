@@ -6,7 +6,7 @@
 #     A High-performance Computing Toolset for Relatedness and
 # Principal Component Analysis of SNP Data
 #
-# Copyright (C) 2011 - 2020        Xiuwen Zheng
+# Copyright (C) 2011 - 2025        Xiuwen Zheng
 # License: GPL-3
 #
 
@@ -238,7 +238,10 @@
             {
                 mac <- if (remove.monosnp) 1L else NA_integer_
                 if (verbose)
-                    cat("Calculating allele counts/frequencies ...\n")
+                {
+                    cat("Calculating allele counts/frequencies (",
+                        n, " variants) ...\n", sep="")
+                }
                 eval(parse(text="
                     SeqArray::seqSetFilterCond(gdsobj, maf=maf, mac=mac,
                         missing.rate=missing.rate, parallel=num.thread,
@@ -261,7 +264,10 @@
                 .cat("    # of samples: ", .pretty(dm[1L]))
                 .cat("    # of SNVs: ", .pretty(dm[2L]))
                 if (verbose.numthread)
-                    .cat("    using ", num.thread, " thread", .plural(num.thread))
+                {
+                    s <- .plural(num.thread)
+                    .cat("    using ", num.thread, " thread", s, "/core", s)
+                }
             }
 
 			if (!is.null(allele.freq))
@@ -465,7 +471,10 @@
         .cat("    # of samples: ", .pretty(dm[2L]))
         .cat("    # of ", SSS, .plural(dm[1L]), ": ", .pretty(dm[1L]))
         if (verbose.numthread)
-            .cat("    using ", num.thread, " thread", .plural(num.thread))
+        {
+            s <- .plural(num.thread)
+            .cat("    using ", num.thread, " thread", s, "/core", s)
+        }
     }
 
     # output
